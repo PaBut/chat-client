@@ -1,0 +1,68 @@
+using ChatClient.Models;
+
+namespace ChatClient.Utilities;
+
+public class WorkflowGraph
+{
+    private readonly IDictionary<(ClientState, (MessageType, bool?)), ClientState> stateMap =
+        new Dictionary<(ClientState, (MessageType, bool?)), ClientState>()
+        {
+            { (ClientState.Start, (MessageType.Auth, null)), ClientState.Authentication },
+            { (ClientState.Authentication, (MessageType.Reply, true)), ClientState.Open },
+            { (ClientState.Authentication, (MessageType.Reply, false)), ClientState.Authentication },
+            { (ClientState.Authentication, (MessageType.Bye, null)), ClientState.End },
+            { (ClientState.Open, (MessageType.Msg, null)), ClientState.Open },
+            { (ClientState.Open, (MessageType.Join, null)), ClientState.Open },
+            { (ClientState.Open, (MessageType.Bye, null)), ClientState.End },
+            { (ClientState.Error, (MessageType.Bye, null)), ClientState.End },
+        };
+
+    private readonly IDictionary<ClientState, MessageType[]?> allowedMessageTypes =
+        new Dictionary<ClientState, MessageType[]?>()
+        {
+            { ClientState.Start, new[] { MessageType.Auth } },
+            { ClientState.Authentication, new[] { MessageType.Reply, MessageType.Bye } },
+            { ClientState.Open, new[] { MessageType.Msg, MessageType.Join, MessageType.Bye, MessageType.Err } },
+            { ClientState.Error, new[] { MessageType.Bye } },
+            { ClientState.End, null }
+        };
+    
+    private ClientState currentState = ClientState.Start;
+
+    public void NextState(MessageType messageType, bool? replySuccess = null)
+    {
+        if (currentState == ClientState.End)
+        {
+            currentState = ClientState.End;
+        }
+
+        var entry = (currentState, (messageType, replySuccess));
+        (ClientState, (MessageType, bool?)) entryNull = (currentState, (messageType, null));
+
+        if (stateMap.TryGetValue(entry, out var value))
+        {
+            currentState = value;
+        }
+        else if(stateMap.TryGetValue(entryNull, out var valueNull))
+        {
+            currentState = value;
+        }
+
+        currentState = ClientState.Error;
+    }
+
+    public bool IsAllowedMessageType(MessageType messageType)
+    {
+        if (allowedMessageTypes[currentState] == null)
+        {
+            return false;
+        }
+        
+        return allowedMessageTypes[currentState]!.Contains(messageType);
+    }
+    
+    public ClientState CurrentState => currentState;
+    
+    public bool IsErrorState => currentState == ClientState.Error;
+    public bool IsEndState => currentState == ClientState.End;
+}
