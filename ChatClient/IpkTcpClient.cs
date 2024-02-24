@@ -16,50 +16,32 @@ public class IpkTcpClient : IIpkClient
         clientStream = client.GetStream();
     }
 
-    public async Task SendMessage(string message, string displayName)
+    public async Task SendMessage(Message message)
     {
-        var messageString = messageBuilder.GetByteMessage(new Message()
-        {
-            MessageType = MessageType.Msg,
-            Arguments = new Dictionary<MessageArguments, object>()
-            {
-                { MessageArguments.DisplayName, displayName },
-                { MessageArguments.MessageContent, message },
-            }
-        });
+        var byteMessage = messageBuilder.GetByteMessage(message);
         
-        await clientStream.WriteAsync(messageString);
+        await clientStream.WriteAsync(byteMessage);
     }
     
-    public async Task Authenticate(string userName, string secret, string displayName)
+    public async Task Authenticate(Message message)
     {
-        var messageString = messageBuilder.GetByteMessage(new Message()
-        {
-            MessageType = MessageType.Auth,
-            Arguments = new Dictionary<MessageArguments, object>()
-            {
-                { MessageArguments.UserName, userName },
-                { MessageArguments.DisplayName, displayName },
-                { MessageArguments.Secret, secret },
-            }
-        });
+        var byteMessage = messageBuilder.GetByteMessage(message);
         
-        await clientStream.WriteAsync(messageString);
+        await clientStream.WriteAsync(byteMessage);
     }
     
-    public async Task JoinChannel(string channelId, string displayName)
+    public async Task JoinChannel(Message message)
     {
-        var messageString = messageBuilder.GetByteMessage(new Message()
-        {
-            MessageType = MessageType.Join,
-            Arguments = new Dictionary<MessageArguments, object>()
-            {
-                { MessageArguments.ChannelId, channelId },
-                { MessageArguments.DisplayName, displayName },
-            }
-        });
+        var byteMessage = messageBuilder.GetByteMessage(message);
         
-        await clientStream.WriteAsync(messageString);
+        await clientStream.WriteAsync(byteMessage);
+    }
+
+    public async Task SendError(Message message)
+    {
+        var byteMessage = messageBuilder.GetByteMessage(message);
+        
+        await clientStream.WriteAsync(byteMessage);
     }
 
     public async Task Leave()

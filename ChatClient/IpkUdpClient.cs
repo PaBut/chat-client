@@ -8,67 +8,59 @@ public class IpkUdpClient : IIpkClient
 {
     private readonly UdpClient client;
     private readonly UdpMessageBuilder messageBuilder = new();
-    private readonly int timeout;
-    private readonly int retrials;
+    private readonly ushort timeout;
+    private readonly byte retrials;
 
     private ushort CurrentMessageId = 0;
     private List<ushort> SeenMessages = new();
     
-    public IpkUdpClient(ushort port, string hostName, short retrials, byte timeout)
+    public IpkUdpClient(string hostName, ushort port, byte retrials, ushort timeout)
     {
         client = new UdpClient(hostName, port);
         this.retrials = retrials;
         this.timeout = timeout;
     }
 
-    public async Task SendMessage(string message, string displayName)
-    {
-        var currentMessageId = CurrentMessageId++;
-
-        var byteMessage = messageBuilder.GetByteMessage(new Message()
-        {
-            MessageType = MessageType.Msg,
-            Arguments = new Dictionary<MessageArguments, object>()
-            {
-                { MessageArguments.DisplayName, displayName },
-                { MessageArguments.MessageContent, message },
-            }
-        });
-
-        await SendWithRetrial(currentMessageId, byteMessage);
-    }
-
-    public async Task Authenticate(string userName, string secret, string displayName)
+    public async Task SendMessage(Message message)
     {
         var messageId = CurrentMessageId++;
+        
+        message.Arguments.Add(MessageArguments.MessageId, messageId);
 
-        var byteMessage = messageBuilder.GetByteMessage(new Message()
-        {
-            MessageType = MessageType.Auth,
-            Arguments = new Dictionary<MessageArguments, object>()
-            {
-                { MessageArguments.UserName, userName },
-                { MessageArguments.DisplayName, displayName },
-                { MessageArguments.Secret, secret },
-            }
-        });
+        var byteMessage = messageBuilder.GetByteMessage(message);
 
         await SendWithRetrial(messageId, byteMessage);
     }
 
-    public async Task JoinChannel(string channelId, string displayName)
+    public async Task Authenticate(Message message)
     {
         var messageId = CurrentMessageId++;
 
-        var byteMessage = messageBuilder.GetByteMessage(new Message()
-        {
-            MessageType = MessageType.Join,
-            Arguments = new Dictionary<MessageArguments, object>()
-            {
-                { MessageArguments.ChannelId, channelId },
-                { MessageArguments.DisplayName, displayName },
-            }
-        });
+        message.Arguments.Add(MessageArguments.MessageId, messageId);
+
+        var byteMessage = messageBuilder.GetByteMessage(message);
+
+        await SendWithRetrial(messageId, byteMessage);
+    }
+
+    public async Task JoinChannel(Message message)
+    {
+        var messageId = CurrentMessageId++;
+
+        message.Arguments.Add(MessageArguments.MessageId, messageId);
+
+        var byteMessage = messageBuilder.GetByteMessage(message);
+
+        await SendWithRetrial(messageId, byteMessage.ToArray());
+    }
+
+    public async Task SendError(Message message)
+    {
+        var messageId = CurrentMessageId++;
+
+        message.Arguments.Add(MessageArguments.MessageId, messageId);
+
+        var byteMessage = messageBuilder.GetByteMessage(message);
 
         await SendWithRetrial(messageId, byteMessage.ToArray());
     }

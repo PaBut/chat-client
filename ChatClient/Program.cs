@@ -3,12 +3,20 @@ using System.Threading.Channels;
 using ChatClient;
 using CommandLine;
 using CommandLine.Text;
+using SocketType = ChatClient.SocketType;
 
 var parserResult = new Parser(with =>
 {
     with.AutoHelp = true;
-    with.HelpWriter = new StreamWriter(Console.OpenStandardOutput());
+    with.HelpWriter = Console.Out;
 }).ParseArguments<CommandLineOptions>(args);
+
+if (args.Contains("-h"))
+{
+    Console.WriteLine(HelpText.AutoBuild(parserResult, h => h, e => e));
+    return;
+}
+
 var commandLineOptions = parserResult
     .WithParsed(options =>
     {
@@ -17,30 +25,41 @@ var commandLineOptions = parserResult
         Console.WriteLine($"Server port: {options.Port}");
         Console.WriteLine($"UDP confirmation timeout: {options.UdpConfirmationTimeout}");
         Console.WriteLine($"UDP confirmation attempts: {options.UdpConfirmationAttempts}");
-    }).WithNotParsed(errors =>
-    {
-        if(errors.Any(error => error.Tag == ErrorType.HelpRequestedError))
-        {
-            Console.WriteLine(HelpText.AutoBuild(parserResult, h =>
-            {
-                //configure HelpText
-                h.AdditionalNewLineAfterOption = false; //remove newline between options
-                h.Heading = "Myapp 2.0.0-beta"; //change header
-                h.Copyright = "Copyright (c) 2019 Global.com"; //change copyright text
-                // more options ...
-                return h;
-            }, e => e));
-        }
-        Console.WriteLine("Invalid command line options");
-    });
+    }).WithNotParsed(errors => { Console.Error.WriteLine("Invalid command line options"); }).Value;
 
-var sender = new Thread(Sender);
-
-IIpkClient ipkClient = default;
-
-static void Sender()
+if (!Enum.TryParse<SocketType>(commandLineOptions.SocketType, true, out var socketType))
 {
-    while (true)
+    Console.Error.WriteLine("Invalid command line options");
+    return;
+}
+
+bool isCanceled = false;
+
+IpkClientFactory ipkClientFactory = new(socketType, commandLineOptions.UdpConfirmationAttempts,
+    commandLineOptions.UdpConfirmationTimeout);
+
+var ipkClient = ipkClientFactory.CreateClient(commandLineOptions.Host, commandLineOptions.Port);
+
+Console.WriteLine($"Connected to {commandLineOptions.Host} on port {commandLineOptions.Port}");
+
+WrappedIpkClient wrappedIpkClient = new(ipkClient);
+
+Console.CancelKeyPress += async (sender, args) =>
+{
+    Console.WriteLine("Exiting...");
+    await wrappedIpkClient.Leave();
+    args.Cancel = true;
+    isCanceled = true;
+};
+
+Task senderTask = Task.Run(async () => await Sender(wrappedIpkClient));
+Task receiverTask = Task.Run(async () => await Receiver(wrappedIpkClient));
+
+await Task.WhenAll(senderTask, receiverTask);
+
+async Task Sender(WrappedIpkClient wrappedClient)
+{
+    while (!isCanceled)
     {
         var userInput = Console.ReadLine();
 
@@ -49,12 +68,23 @@ static void Sender()
             return;
         }
 
-        if (userInput[0] != '/')
-        {
-            ipkClient.SendMessage(userInput);
-        }
-        
+        await wrappedClient.RunCommand(userInput);
     }
 }
 
-static 
+async Task Receiver(WrappedIpkClient wrappedClient)
+{
+    while (!isCanceled)
+    {
+        var response = await wrappedClient.Listen();
+
+        if(string.IsNullOrEmpty(response))
+        {
+            return;
+        }
+        
+        Console.Write(response);
+    }
+}
+
+Console.ReadKey();

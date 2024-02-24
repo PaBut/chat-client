@@ -13,6 +13,7 @@ public class WorkflowGraph
             { (ClientState.Authentication, (MessageType.Bye, null)), ClientState.End },
             { (ClientState.Open, (MessageType.Msg, null)), ClientState.Open },
             { (ClientState.Open, (MessageType.Join, null)), ClientState.Open },
+            { (ClientState.Open, (MessageType.Reply, null)), ClientState.Open },
             { (ClientState.Open, (MessageType.Bye, null)), ClientState.End },
             { (ClientState.Error, (MessageType.Bye, null)), ClientState.End },
         };
@@ -47,8 +48,10 @@ public class WorkflowGraph
         {
             currentState = value;
         }
-
-        currentState = ClientState.Error;
+        else
+        {
+            currentState = ClientState.Error;
+        }
     }
 
     public bool IsAllowedMessageType(MessageType messageType)

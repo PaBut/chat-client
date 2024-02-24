@@ -14,7 +14,8 @@ public static class TcpMessageTypeCoder
         { "BYE", MessageType.Bye },
     };
 
-    public static MessageType? GetMessageType(string code) => MessageTypeMap.ContainsKey(code) ? MessageTypeMap[code] : null;
+    public static MessageType? GetMessageType(string code) =>
+        MessageTypeMap.ContainsKey(code) ? MessageTypeMap[code] : MessageType.Unknown;
 
     public static string GetMessageString(MessageType type)
         => MessageTypeMap.FirstOrDefault(t => t.Value == type).Key;

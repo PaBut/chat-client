@@ -4,9 +4,10 @@ namespace ChatClient;
 
 public interface IIpkClient : IDisposable
 {
-    Task SendMessage(string message, string displayName);
-    Task Authenticate(string userName, string secret, string displayName);
-    Task JoinChannel(string channelId, string displayName);
+    Task SendMessage(Message message);
+    Task Authenticate(Message message);
+    Task JoinChannel(Message message);
+    Task SendError(Message message);
     Task Leave();
     Task<Message> Listen();
 }
