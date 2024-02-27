@@ -74,8 +74,13 @@ public class TcpMessageBuilder : IMessageBuilder
 
         string[] messageParts = messageString.Split(" ");
 
-        var stringMessageType = messageParts[1] == "FROM" ? string.Join(' ', messageParts[..2]) : messageParts[0];
-
+        var stringMessageType = messageParts[0];
+        
+        if (messageParts.Length > 1 && messageParts[1] == "FROM")
+        {
+            stringMessageType = string.Join(' ', messageParts[..2]);
+        }
+        
         var messageType = TcpMessageTypeCoder.GetMessageType(stringMessageType);
 
         var messageArguments = new Dictionary<MessageArguments, object>();

@@ -29,28 +29,33 @@ public class WorkflowGraph
         };
     
     private ClientState currentState = ClientState.Start;
+    
+    private readonly object locker = new();
 
     public void NextState(MessageType messageType, bool? replySuccess = null)
     {
-        if (currentState == ClientState.End)
+        lock (locker)
         {
-            currentState = ClientState.End;
-        }
+            if (currentState == ClientState.End)
+            {
+                currentState = ClientState.End;
+            }
 
-        var entry = (currentState, (messageType, replySuccess));
-        (ClientState, (MessageType, bool?)) entryNull = (currentState, (messageType, null));
+            var entry = (currentState, (messageType, replySuccess));
+            (ClientState, (MessageType, bool?)) entryNull = (currentState, (messageType, null));
 
-        if (stateMap.TryGetValue(entry, out var value))
-        {
-            currentState = value;
-        }
-        else if(stateMap.TryGetValue(entryNull, out var valueNull))
-        {
-            currentState = value;
-        }
-        else
-        {
-            currentState = ClientState.Error;
+            if (stateMap.TryGetValue(entry, out var value))
+            {
+                currentState = value;
+            }
+            else if(stateMap.TryGetValue(entryNull, out var valueNull))
+            {
+                currentState = value;
+            }
+            else
+            {
+                currentState = ClientState.Error;
+            }
         }
     }
 
