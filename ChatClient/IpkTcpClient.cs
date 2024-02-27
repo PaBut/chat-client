@@ -16,32 +16,32 @@ public class IpkTcpClient : IIpkClient
         clientStream = client.GetStream();
     }
 
-    public async Task SendMessage(Message message)
+    public async Task SendMessage(Message message, CancellationToken cancellationToken = default)
     {
         var byteMessage = messageBuilder.GetByteMessage(message);
         
-        await clientStream.WriteAsync(byteMessage);
+        await clientStream.WriteAsync(byteMessage, cancellationToken);
     }
     
-    public async Task Authenticate(Message message)
+    public async Task Authenticate(Message message, CancellationToken cancellationToken = default)
     {
         var byteMessage = messageBuilder.GetByteMessage(message);
         
-        await clientStream.WriteAsync(byteMessage);
+        await clientStream.WriteAsync(byteMessage, cancellationToken);
     }
     
-    public async Task JoinChannel(Message message)
+    public async Task JoinChannel(Message message, CancellationToken cancellationToken = default)
     {
         var byteMessage = messageBuilder.GetByteMessage(message);
         
-        await clientStream.WriteAsync(byteMessage);
+        await clientStream.WriteAsync(byteMessage, cancellationToken);
     }
 
-    public async Task SendError(Message message)
+    public async Task SendError(Message message, CancellationToken cancellationToken = default)
     {
         var byteMessage = messageBuilder.GetByteMessage(message);
         
-        await clientStream.WriteAsync(byteMessage);
+        await clientStream.WriteAsync(byteMessage, cancellationToken);
     }
 
     public async Task Leave()
@@ -55,10 +55,10 @@ public class IpkTcpClient : IIpkClient
         await clientStream.WriteAsync(messageString);
     }
 
-    public async Task<Message> Listen()
+    public async Task<Message> Listen(CancellationToken cancellationToken = default)
     {
         Memory<byte> buffer = new byte[2000];
-        var byteCount = await clientStream.ReadAsync(buffer);
+        var byteCount = await clientStream.ReadAsync(buffer, cancellationToken);
         return messageBuilder.DecodeMessage(buffer.ToArray()[..byteCount]);
     }
 

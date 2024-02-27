@@ -44,39 +44,44 @@ Console.WriteLine($"Connected to {commandLineOptions.Host} on port {commandLineO
 
 WrappedIpkClient wrappedIpkClient = new(ipkClient);
 
+CancellationTokenSource cancellationTokenSource = new();
+
+var token = cancellationTokenSource.Token;
+
 Console.CancelKeyPress += async (sender, args) =>
 {
+    cancellationTokenSource.Cancel();
     Console.WriteLine("Exiting...");
     await wrappedIpkClient.Leave();
     args.Cancel = true;
     isCanceled = true;
 };
 
-Task senderTask = Task.Run(async () => await Sender(wrappedIpkClient));
-Task receiverTask = Task.Run(async () => await Receiver(wrappedIpkClient));
+Task senderTask = Task.Run(async () => await Sender(wrappedIpkClient, token));
+Task receiverTask = Task.Run(async () => await Receiver(wrappedIpkClient, token));
 
 await Task.WhenAll(senderTask, receiverTask);
 
-async Task Sender(WrappedIpkClient wrappedClient)
+async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellationToken)
 {
     while (!isCanceled)
     {
-        var userInput = Console.ReadLine();
+        var userInput = await Console.In.ReadLineAsync(cancellationToken);
 
         if (string.IsNullOrEmpty(userInput))
         {
             return;
         }
 
-        await wrappedClient.RunCommand(userInput);
+        await wrappedClient.RunCommand(userInput, cancellationToken);
     }
 }
 
-async Task Receiver(WrappedIpkClient wrappedClient)
+async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellationToken)
 {
     while (!isCanceled)
     {
-        var response = await wrappedClient.Listen();
+        var response = await wrappedClient.Listen(cancellationToken);
 
         if(string.IsNullOrEmpty(response))
         {

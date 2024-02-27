@@ -14,7 +14,7 @@ public class WrappedIpkClient : IDisposable
         this.ipkClient = ipkClient;
     }
 
-    public async Task RunCommand(string command)
+    public async Task RunCommand(string command, CancellationToken cancellationToken = default)
     {
         var parts = command.Split(' ');
         
@@ -62,13 +62,13 @@ public class WrappedIpkClient : IDisposable
         switch (message.MessageType)
         {
             case MessageType.Auth:
-                await Authenticate(message);
+                await Authenticate(message, cancellationToken);
                 break;
             case MessageType.Join:
-                await JoinChannel(message);
+                await JoinChannel(message, cancellationToken);
                 break;
             case MessageType.Msg:
-                await SendMessage(message);
+                await SendMessage(message, cancellationToken);
                 break;
         }
     }
@@ -80,33 +80,33 @@ public class WrappedIpkClient : IDisposable
         workflow.NextState(MessageType.Bye);
     }
     
-    private async Task SendMessage(Message message)
+    private async Task SendMessage(Message message, CancellationToken cancellationToken = default)
     {
         message.Arguments.Add(MessageArguments.DisplayName, displayName!);
-        await ipkClient.SendMessage(message);
+        await ipkClient.SendMessage(message, cancellationToken);
 
         workflow.NextState(MessageType.Msg);
     }
     
-    private async Task Authenticate(Message message)
+    private async Task Authenticate(Message message, CancellationToken cancellationToken = default)
     { 
         SetDisplayName((string)message.Arguments[MessageArguments.DisplayName]);
-        await ipkClient.Authenticate(message);
+        await ipkClient.Authenticate(message, cancellationToken);
 
         workflow.NextState(MessageType.Auth);
     }
     
-    private async Task JoinChannel(Message message)
+    private async Task JoinChannel(Message message, CancellationToken cancellationToken = default)
     {
         message.Arguments.Add(MessageArguments.DisplayName, displayName!);
-        await ipkClient.JoinChannel(message);
+        await ipkClient.JoinChannel(message, cancellationToken);
         
         workflow.NextState(MessageType.Join);
     }
     
-    public async Task<string?> Listen()
+    public async Task<string?> Listen(CancellationToken cancellationToken = default)
     {
-        var message = await ipkClient.Listen();
+        var message = await ipkClient.Listen(cancellationToken);
         
         bool? replySuccess = null;
         
@@ -129,7 +129,7 @@ public class WrappedIpkClient : IDisposable
                 }
             };
             
-            await ipkClient.SendError(errorMessage);
+            await ipkClient.SendError(errorMessage, cancellationToken);
             
             return null;
         }

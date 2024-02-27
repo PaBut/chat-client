@@ -21,7 +21,7 @@ public class IpkUdpClient : IIpkClient
         this.timeout = timeout;
     }
 
-    public async Task SendMessage(Message message)
+    public async Task SendMessage(Message message, CancellationToken cancellationToken = default)
     {
         var messageId = CurrentMessageId++;
         
@@ -29,10 +29,10 @@ public class IpkUdpClient : IIpkClient
 
         var byteMessage = messageBuilder.GetByteMessage(message);
 
-        await SendWithRetrial(messageId, byteMessage);
+        await SendWithRetrial(messageId, byteMessage, cancellationToken);
     }
 
-    public async Task Authenticate(Message message)
+    public async Task Authenticate(Message message, CancellationToken cancellationToken = default)
     {
         var messageId = CurrentMessageId++;
 
@@ -40,10 +40,10 @@ public class IpkUdpClient : IIpkClient
 
         var byteMessage = messageBuilder.GetByteMessage(message);
 
-        await SendWithRetrial(messageId, byteMessage);
+        await SendWithRetrial(messageId, byteMessage, cancellationToken);
     }
 
-    public async Task JoinChannel(Message message)
+    public async Task JoinChannel(Message message, CancellationToken cancellationToken = default)
     {
         var messageId = CurrentMessageId++;
 
@@ -51,10 +51,10 @@ public class IpkUdpClient : IIpkClient
 
         var byteMessage = messageBuilder.GetByteMessage(message);
 
-        await SendWithRetrial(messageId, byteMessage.ToArray());
+        await SendWithRetrial(messageId, byteMessage, cancellationToken);
     }
 
-    public async Task SendError(Message message)
+    public async Task SendError(Message message, CancellationToken cancellationToken = default)
     {
         var messageId = CurrentMessageId++;
 
@@ -62,7 +62,7 @@ public class IpkUdpClient : IIpkClient
 
         var byteMessage = messageBuilder.GetByteMessage(message);
 
-        await SendWithRetrial(messageId, byteMessage.ToArray());
+        await SendWithRetrial(messageId, byteMessage, cancellationToken);
     }
 
     public async Task Leave()
@@ -81,9 +81,9 @@ public class IpkUdpClient : IIpkClient
         await SendWithRetrial(messageId, byteMessage);
     }
 
-    public async Task<Message> Listen()
+    public async Task<Message> Listen(CancellationToken cancellationToken = default)
     {
-        var response = await client.ReceiveAsync();
+        var response = await client.ReceiveAsync(cancellationToken);
 
         var message = messageBuilder.DecodeMessage(response.Buffer);
 
@@ -98,21 +98,21 @@ public class IpkUdpClient : IIpkClient
         else
         {
             var messageId = (ushort)message.Arguments[MessageArguments.MessageId];
-            await SendConfirmation(messageId);
+            await SendConfirmation(messageId, cancellationToken);
         }
 
         return message;
     }
 
-    private async Task SendWithRetrial(ushort messageId, byte[] message)
+    private async Task SendWithRetrial(ushort messageId, byte[] message, CancellationToken cancellationToken = default)
     {
         for (int i = 0; i < retrials + 1; i++)
         {
-            await client.SendAsync(message.ToArray(), message.Length);
+            await client.SendAsync(message, message.Length);
 
-            var task = client.ReceiveAsync();
+            var task = client.ReceiveAsync(cancellationToken).AsTask();
 
-            if (await Task.WhenAny(task, Task.Delay(TimeSpan.FromMilliseconds(timeout))) == task)
+            if (await Task.WhenAny(task, Task.Delay(TimeSpan.FromMilliseconds(timeout), cancellationToken)) == task)
             {
                 var response = await task;
                 if (response.Buffer.Length > 2 && response.Buffer[0] == 0 &&
@@ -129,7 +129,7 @@ public class IpkUdpClient : IIpkClient
         }
     }
 
-    private async Task SendConfirmation(ushort messageId)
+    private async Task SendConfirmation(ushort messageId, CancellationToken cancellationToken = default)
     {
         var byteMessage = messageBuilder.GetByteMessage(new Message()
         {
