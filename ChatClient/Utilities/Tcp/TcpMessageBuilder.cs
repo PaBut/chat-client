@@ -27,7 +27,7 @@ public class TcpMessageBuilder : IMessageBuilder
                 // Error
             }
 
-            messageString += (string)message.Arguments[MessageArguments.ChannelId] + " " +
+            messageString += (string)message.Arguments[MessageArguments.ChannelId] + " AS " +
                              (string)message.Arguments[MessageArguments.DisplayName];
         }
         else if (message.MessageType == MessageType.Auth)
@@ -39,7 +39,7 @@ public class TcpMessageBuilder : IMessageBuilder
                 // Error
             }
 
-            messageString += (string)message.Arguments[MessageArguments.UserName] + " " +
+            messageString += (string)message.Arguments[MessageArguments.UserName] + " AS " +
                              (string)message.Arguments[MessageArguments.DisplayName] + " USING " +
                              (string)message.Arguments[MessageArguments.Secret];
         }
@@ -62,8 +62,8 @@ public class TcpMessageBuilder : IMessageBuilder
         {
             throw new Exception("Not supported");
         }
-        
-        
+
+        Console.WriteLine(messageString);
 
         return Encoding.UTF8.GetBytes(messageString + CLRF);
     }
@@ -71,6 +71,8 @@ public class TcpMessageBuilder : IMessageBuilder
     public Message DecodeMessage(byte[] message)
     {
         string messageString = Encoding.UTF8.GetString(message);
+
+        Console.Write($"////////////Server(decoded): {messageString}");
 
         string[] messageParts = messageString.Split(" ");
 
@@ -114,6 +116,11 @@ public class TcpMessageBuilder : IMessageBuilder
             }
 
             messageArguments.Add(MessageArguments.MessageContent, string.Join(' ', messageParts[3..]));
+        }
+        else if (messageString.Contains(CLRF) && messageString.Split(CLRF)[0] == "BYE")
+        {
+            Console.Write($"Server: {messageString}");
+            messageType = MessageType.Bye;
         }
         else if (messageType != MessageType.Bye)
         {

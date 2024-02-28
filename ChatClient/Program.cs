@@ -38,7 +38,24 @@ bool isCanceled = false;
 IpkClientFactory ipkClientFactory = new(socketType, commandLineOptions.UdpConfirmationAttempts,
     commandLineOptions.UdpConfirmationTimeout);
 
-var ipkClient = ipkClientFactory.CreateClient(commandLineOptions.Host, commandLineOptions.Port);
+IIpkClient? ipkClient = null;
+
+// for (int i = 0; i < 100 && ipkClient == null; i++)
+// {
+    ipkClient = ipkClientFactory.CreateClient(commandLineOptions.Host, commandLineOptions.Port);
+//     Console.WriteLine($"Debug: {i}th try");
+//     if (ipkClient != null)
+//     {
+//         Console.WriteLine("Finally");
+//     }
+// }
+
+
+if (ipkClient == null)
+{
+    Console.WriteLine("ERROR: Connection refused");
+    return;
+}
 
 Console.WriteLine($"Connected to {commandLineOptions.Host} on port {commandLineOptions.Port}");
 
@@ -50,9 +67,11 @@ var token = cancellationTokenSource.Token;
 
 Console.CancelKeyPress += async (sender, args) =>
 {
-    cancellationTokenSource.Cancel();
-    Console.WriteLine("Exiting...");
     await wrappedIpkClient.Leave();
+    cancellationTokenSource.Cancel();
+    cancellationTokenSource.Dispose();
+    wrappedIpkClient.Dispose();
+    Console.WriteLine("Exiting...");
     args.Cancel = true;
     isCanceled = true;
 };
@@ -60,7 +79,7 @@ Console.CancelKeyPress += async (sender, args) =>
 Task senderTask = Task.Run(async () => await Sender(wrappedIpkClient, token));
 Task receiverTask = Task.Run(async () => await Receiver(wrappedIpkClient, token));
 
-await Task.WhenAll(senderTask, receiverTask);
+Task.WaitAll(senderTask, receiverTask);
 
 async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellationToken)
 {
@@ -92,4 +111,5 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
     }
 }
 
+Console.ReadKey();
 Console.ReadKey();

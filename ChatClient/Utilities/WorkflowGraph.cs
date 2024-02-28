@@ -22,15 +22,21 @@ public class WorkflowGraph
         new Dictionary<ClientState, MessageType[]?>()
         {
             { ClientState.Start, new[] { MessageType.Auth } },
-            { ClientState.Authentication, new[] { MessageType.Reply, MessageType.Bye } },
+            { ClientState.Authentication, new[] { MessageType.Reply, MessageType.Bye, MessageType.Auth } },
             { ClientState.Open, new[] { MessageType.Msg, MessageType.Join, MessageType.Bye, MessageType.Err } },
             { ClientState.Error, new[] { MessageType.Bye } },
             { ClientState.End, null }
         };
     
-    private ClientState currentState = ClientState.Start;
+    private ClientState currentState;
     
-    private readonly object locker = new();
+    private readonly object locker;
+
+    public WorkflowGraph()
+    {
+        currentState = ClientState.Start;
+        locker = new();
+    }
 
     public void NextState(MessageType messageType, bool? replySuccess = null)
     {
@@ -50,7 +56,7 @@ public class WorkflowGraph
             }
             else if(stateMap.TryGetValue(entryNull, out var valueNull))
             {
-                currentState = value;
+                currentState = valueNull;
             }
             else
             {

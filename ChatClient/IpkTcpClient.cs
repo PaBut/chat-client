@@ -10,10 +10,10 @@ public class IpkTcpClient : IIpkClient
     private readonly NetworkStream clientStream;
     private readonly TcpMessageBuilder messageBuilder = new();
     
-    public IpkTcpClient(string hostName, ushort port)
+    private IpkTcpClient(TcpClient client)
     {
-        client = new TcpClient(hostName, port);
-        clientStream = client.GetStream();
+        this.client = client;
+        this.clientStream = client.GetStream();
     }
 
     public async Task SendMessage(Message message, CancellationToken cancellationToken = default)
@@ -64,7 +64,23 @@ public class IpkTcpClient : IIpkClient
 
     public void Dispose()
     {
-        client.Dispose();
         clientStream.Dispose();
+        client.Dispose();
+    }
+
+    public static IpkTcpClient? Create(string hostName, ushort port)
+    {
+        try
+        {
+            var client = new TcpClient();
+            
+            client.Connect(hostName, port);
+            
+            return new IpkTcpClient(client);
+        }
+        catch (SocketException)
+        {
+            return null;
+        }            
     }
 }

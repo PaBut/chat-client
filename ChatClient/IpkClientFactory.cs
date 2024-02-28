@@ -15,9 +15,9 @@ public class IpkClientFactory
         this.udpConfirmationTimeout = udpConfirmationTimeout;
     }
 
-    public IIpkClient CreateClient(string hostName, ushort port) => socketType switch
+    public IIpkClient? CreateClient(string hostName, ushort port) => socketType switch
     {
-        SocketType.Tcp => new IpkTcpClient(hostName, port),
+        SocketType.Tcp => IpkTcpClient.Create(hostName, port),
         SocketType.Udp => new IpkUdpClient(hostName, port,
             udpConfirmationAttempts!.Value, udpConfirmationTimeout!.Value)
     };
