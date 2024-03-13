@@ -42,9 +42,9 @@ public class WorkflowGraph
     {
         lock (locker)
         {
-            if (currentState == ClientState.End)
+            if (currentState == ClientState.End || messageType == MessageType.Confirm)
             {
-                currentState = ClientState.End;
+                return;
             }
 
             var entry = (currentState, (messageType, replySuccess));

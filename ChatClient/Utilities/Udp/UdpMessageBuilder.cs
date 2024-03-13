@@ -24,19 +24,23 @@ public class UdpMessageBuilder : IMessageBuilder
                     // TODO: Validation error
                 }
 
-                arguments.Add(MessageArguments.ReferenceMessageId, BitConverter.ToInt16(message[1..3]));
+                arguments.Add(MessageArguments.ReferenceMessageId, BitConverter.ToUInt16(message[1..3]));
                 break;
             case MessageType.Reply:
                 if (message.Length < 8)
                 {
                     // TODO: Validation error
+                    return new Message()
+                    {
+                        MessageType = MessageType.Unknown
+                    };
                 }
 
-                arguments.Add(MessageArguments.MessageId, BitConverter.ToInt16(message[1..3]));
+                arguments.Add(MessageArguments.MessageId, BitConverter.ToUInt16(message[1..3]));
 
                 arguments.Add(MessageArguments.ReplyStatus, message[3] == 1);
 
-                arguments.Add(MessageArguments.ReferenceMessageId, BitConverter.ToInt16(message[4..6]));
+                arguments.Add(MessageArguments.ReferenceMessageId, BitConverter.ToUInt16(message[4..6]));
 
                 var messageContentEnd1 = GetEndOfTheFloatingMessage(6, message);
 
@@ -51,7 +55,7 @@ public class UdpMessageBuilder : IMessageBuilder
                     // TODO: Validation error
                 }
 
-                arguments.Add(MessageArguments.MessageId, BitConverter.ToInt16(message[1..3]));
+                arguments.Add(MessageArguments.MessageId, BitConverter.ToUInt16(message[1..3]));
 
                 var displayNameEnd = GetEndOfTheFloatingMessage(3, message);
 
@@ -85,7 +89,6 @@ public class UdpMessageBuilder : IMessageBuilder
         List<byte> byteMessage = new();
 
         byteMessage.Add(UdpMessageTypeCoder.GetMessageTypeCode(message.MessageType));
-        byteMessage.AddRange(BitConverter.GetBytes((ushort)message.Arguments[MessageArguments.MessageId]));
 
         if (message.MessageType == MessageType.Confirm)
         {
@@ -93,9 +96,9 @@ public class UdpMessageBuilder : IMessageBuilder
 
             return byteMessage.ToArray();
         }
-
+        
         byteMessage.AddRange(BitConverter.GetBytes((ushort)message.Arguments[MessageArguments.MessageId]));
-
+        
         switch (message.MessageType)
         {
             case MessageType.Err:

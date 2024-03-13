@@ -104,7 +104,7 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
 
         if(string.IsNullOrEmpty(response))
         {
-            return;
+            continue;
         }
         
         Console.Write(response);

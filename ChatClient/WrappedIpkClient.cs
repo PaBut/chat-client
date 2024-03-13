@@ -6,12 +6,13 @@ namespace ChatClient;
 public class WrappedIpkClient : IDisposable
 {
     private readonly IIpkClient ipkClient;
-    private readonly WorkflowGraph workflow = new();
+    private readonly WorkflowGraph workflow;
     private string? displayName;
 
     public WrappedIpkClient(IIpkClient ipkClient)
     {
         this.ipkClient = ipkClient;
+        this.workflow = new();
     }
 
     public async Task RunCommand(string command, CancellationToken cancellationToken = default)
@@ -107,6 +108,11 @@ public class WrappedIpkClient : IDisposable
     public async Task<string?> Listen(CancellationToken cancellationToken = default)
     {
         var message = await ipkClient.Listen(cancellationToken);
+
+        if (message.MessageType == MessageType.Unknown)
+        {
+            return null;
+        }
         
         bool? replySuccess = null;
         

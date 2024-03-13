@@ -18,7 +18,7 @@ public class IpkClientFactory
     public IIpkClient? CreateClient(string hostName, ushort port) => socketType switch
     {
         SocketType.Tcp => IpkTcpClient.Create(hostName, port),
-        SocketType.Udp => new IpkUdpClient(hostName, port,
+        SocketType.Udp => IpkUdpClient.Create(hostName, port,
             udpConfirmationAttempts!.Value, udpConfirmationTimeout!.Value)
     };
 }

@@ -10,7 +10,7 @@ public static class TcpMessageTypeCoder
         { "AUTH", MessageType.Auth },
         { "JOIN", MessageType.Join },
         { "MSG FROM", MessageType.Msg },
-        { "ERROR FROM", MessageType.Err },
+        { "ERR FROM", MessageType.Err },
         { "BYE", MessageType.Bye },
     };
 
