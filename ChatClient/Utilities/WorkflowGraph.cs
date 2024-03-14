@@ -42,7 +42,7 @@ public class WorkflowGraph
     {
         lock (locker)
         {
-            if (currentState == ClientState.End || messageType == MessageType.Confirm)
+            if (currentState == ClientState.End || messageType == MessageType.Confirm || messageType == MessageType.AlreadyProcessed)
             {
                 return;
             }

@@ -8,6 +8,7 @@ public class WrappedIpkClient : IDisposable
     private readonly IIpkClient ipkClient;
     private readonly WorkflowGraph workflow;
     private string? displayName;
+    private bool awaitReply = false;
 
     public WrappedIpkClient(IIpkClient ipkClient)
     {
@@ -93,6 +94,8 @@ public class WrappedIpkClient : IDisposable
     { 
         SetDisplayName((string)message.Arguments[MessageArguments.DisplayName]);
         await ipkClient.Authenticate(message, cancellationToken);
+        awaitReply = true;
+        while(awaitReply){}
 
         workflow.NextState(MessageType.Auth);
     }
@@ -101,6 +104,8 @@ public class WrappedIpkClient : IDisposable
     {
         message.Arguments.Add(MessageArguments.DisplayName, displayName!);
         await ipkClient.JoinChannel(message, cancellationToken);
+        awaitReply = true;
+        while(awaitReply){}
         
         workflow.NextState(MessageType.Join);
     }
@@ -109,8 +114,25 @@ public class WrappedIpkClient : IDisposable
     {
         var message = await ipkClient.Listen(cancellationToken);
 
+        if (message.MessageType == MessageType.Confirm)
+        {
+            return null;
+        }
+
         if (message.MessageType == MessageType.Unknown)
         {
+            Message errorMessage = new()
+            {
+                MessageType = MessageType.Err,
+                Arguments = new Dictionary<MessageArguments, object>()
+                {
+                    { MessageArguments.DisplayName, displayName ?? "" },
+                    { MessageArguments.MessageContent, "Unsupported type of message" }
+                }
+            };
+            
+            await ipkClient.SendError(errorMessage, cancellationToken);
+            
             return null;
         }
         
@@ -118,6 +140,7 @@ public class WrappedIpkClient : IDisposable
         
         if (message.MessageType == MessageType.Reply)
         {
+            awaitReply = false;
             replySuccess = (bool) message.Arguments[MessageArguments.ReplyStatus];
         }
         
@@ -125,7 +148,7 @@ public class WrappedIpkClient : IDisposable
         
         if(workflow.IsErrorState)
         {
-            Message errorMessage = new()
+            /*Message errorMessage = new()
             {
                 MessageType = MessageType.Err,
                 Arguments = new Dictionary<MessageArguments, object>()
@@ -137,7 +160,7 @@ public class WrappedIpkClient : IDisposable
             
             await ipkClient.SendError(errorMessage, cancellationToken);
             
-            return null;
+            return null;*/
         }
         
         return message.ToString();

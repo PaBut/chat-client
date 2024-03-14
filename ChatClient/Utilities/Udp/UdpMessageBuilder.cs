@@ -44,7 +44,7 @@ public class UdpMessageBuilder : IMessageBuilder
 
                 var messageContentEnd1 = GetEndOfTheFloatingMessage(6, message);
 
-                arguments.Add(MessageArguments.MessageContent, Encoding.UTF8.GetString(message[7..messageContentEnd1]));
+                arguments.Add(MessageArguments.MessageContent, Encoding.UTF8.GetString(message[6..messageContentEnd1]));
 
                 break;
 
@@ -61,7 +61,7 @@ public class UdpMessageBuilder : IMessageBuilder
 
                 arguments.Add(MessageArguments.DisplayName, Encoding.UTF8.GetString(message[3..displayNameEnd]));
 
-                var messageContentEnd2 = GetEndOfTheFloatingMessage(displayNameEnd, message);
+                var messageContentEnd2 = GetEndOfTheFloatingMessage(displayNameEnd + 1, message);
 
                 arguments.Add(MessageArguments.MessageContent,
                     Encoding.UTF8.GetString(message[displayNameEnd..messageContentEnd2]));

@@ -9,23 +9,23 @@ namespace ChatClient;
 
 public class IpkUdpClient : IIpkClient
 {
-    private class ConfirmTimer
-    {
-        public Timer Timer { get; }
-        public int Retrials { get; set; }
-        public ManualResetEvent ResetEvent { get; }
-
-        public ConfirmTimer(Timer timer, ManualResetEvent resetEvent, int retrials)
-        {
-            Timer = timer;
-            ResetEvent = resetEvent;
-            Retrials = retrials;
-        }
-    }
+    // private class ConfirmTimer
+    // {
+    //     public Timer Timer { get; }
+    //     public int Retrials { get; set; }
+    //     public ManualResetEvent ResetEvent { get; }
+    //
+    //     public ConfirmTimer(Timer timer, ManualResetEvent resetEvent, int retrials)
+    //     {
+    //         Timer = timer;
+    //         ResetEvent = resetEvent;
+    //         Retrials = retrials;
+    //     }
+    // }
     
     private readonly UdpClient client;
     private readonly UdpMessageBuilder messageBuilder = new();
-    private readonly IDictionary<ushort, ConfirmTimer> timers;
+    //private readonly IDictionary<ushort, ConfirmTimer> timers;
     private readonly ushort timeout;
     private readonly byte retrials;
 
@@ -33,6 +33,7 @@ public class IpkUdpClient : IIpkClient
     private IPEndPoint remoteEndPoint;
     private ushort CurrentMessageId = 0;
     private List<ushort> SeenMessages = new();
+    private List<ushort> ConfirmedMessages = new();
 
     private IpkUdpClient(UdpClient client, IPEndPoint endpoint, byte retrials, ushort timeout)
     {
@@ -40,7 +41,7 @@ public class IpkUdpClient : IIpkClient
         this.retrials = retrials;
         this.timeout = timeout;
         this.remoteEndPoint = endpoint;
-        timers = new ConcurrentDictionary<ushort, ConfirmTimer>();
+        //timers = new ConcurrentDictionary<ushort, ConfirmTimer>();
     }
 
     public async Task SendMessage(Message message, CancellationToken cancellationToken = default)
@@ -107,12 +108,6 @@ public class IpkUdpClient : IIpkClient
     {
         var response = await client.ReceiveAsync(cancellationToken);
 
-        if (!portUpdated)
-        {
-            remoteEndPoint.Port = response.RemoteEndPoint.Port;
-            portUpdated = true;
-        }
-
         var message = messageBuilder.DecodeMessage(response.Buffer);
 
         if (message.MessageType == MessageType.Unknown)
@@ -123,22 +118,31 @@ public class IpkUdpClient : IIpkClient
         if (message.MessageType == MessageType.Confirm)
         {
             var messageId = (ushort)message.Arguments[MessageArguments.ReferenceMessageId];
-            if (timers.ContainsKey(messageId))
+            // if (timers.ContainsKey(messageId))
+            // {
+                //var timerEntry = timers[messageId];
+                // timerEntry.ResetEvent.Set();
+                // await timerEntry.Timer.DisposeAsync();
+                //timers.Remove(messageId);
+            // }
+
+            if (!ConfirmedMessages.Contains(messageId))
             {
-                var timerEntry = timers[messageId];
-                timerEntry.ResetEvent.Set();
-                await timerEntry.Timer.DisposeAsync();
-                timers.Remove(messageId);
-                //SeenMessages.Add(messageId);
+                ConfirmedMessages.Add(messageId);
             }
         }
         else
         {
+            if (!portUpdated)
+            {
+                remoteEndPoint.Port = response.RemoteEndPoint.Port;
+                portUpdated = true;
+            }
             var messageId = (ushort)message.Arguments[MessageArguments.MessageId];
             await SendConfirmation(messageId, cancellationToken);
             if (SeenMessages.Contains(messageId))
             {
-                return new Message() { MessageType = MessageType.Unknown };
+                return new Message() { MessageType = MessageType.AlreadyProcessed };
             }
             SeenMessages.Add(messageId);
         }
@@ -148,27 +152,38 @@ public class IpkUdpClient : IIpkClient
 
     private async Task SendWithRetrial(ushort messageId, byte[] message, CancellationToken cancellationToken = default)
     {
-        var resetEvent = new ManualResetEvent(false);
-        
-        var timer = new Timer(
-            async (state) =>
+
+        for (int i = 0; i < retrials + 1 && !ConfirmedMessages.Contains(messageId); i++)
+        {
+            await client.SendAsync(message, message.Length, remoteEndPoint);
+
+            await Task.WhenAny(Task.Delay(timeout, cancellationToken), Task.Run(() =>
             {
-                if (!timers.ContainsKey(messageId))
-                {
-                    return;
-                }
-                if (timers[messageId].Retrials-- <= 0)
-                {
-                    resetEvent.Set();
-                    await timers[messageId].Timer.DisposeAsync();
-                }
-
-                await client.SendAsync(message, message.Length, remoteEndPoint);
-            }, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(timeout));
-
-        timers.Add(messageId, new ConfirmTimer(timer, resetEvent, retrials));
-
-        resetEvent.WaitOne();
+                while (!ConfirmedMessages.Contains(messageId)) { }
+            }));
+        }
+        
+        // var resetEvent = new ManualResetEvent(false);
+        //
+        // var timer = new Timer(
+        //     async (state) =>
+        //     {
+        //         if (!timers.ContainsKey(messageId))
+        //         {
+        //             return;
+        //         }
+        //         if (timers[messageId].Retrials-- <= 0)
+        //         {
+        //             resetEvent.Set();
+        //             await timers[messageId].Timer.DisposeAsync();
+        //         }
+        //
+        //         await client.SendAsync(message, message.Length, remoteEndPoint);
+        //     }, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(timeout));
+        //
+        // timers.Add(messageId, new ConfirmTimer(timer, resetEvent, retrials));
+        //
+        // resetEvent.WaitOne();
 
         // for (int i = 0; i < retrials + 1 && !SeenMessages.Contains(messageId); i++)
         // {

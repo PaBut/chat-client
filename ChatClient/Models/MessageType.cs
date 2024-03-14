@@ -9,5 +9,7 @@ public enum MessageType
     Bye,
     Msg,
     Confirm,
-    Unknown
+    Unknown,
+    ParsingError,
+    AlreadyProcessed
 }
