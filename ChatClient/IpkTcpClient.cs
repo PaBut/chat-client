@@ -8,12 +8,15 @@ public class IpkTcpClient : IIpkClient
 {
     private readonly TcpClient client;
     private readonly NetworkStream clientStream;
-    private readonly TcpMessageBuilder messageBuilder = new();
+    private readonly TcpMessageBuilder messageBuilder;
+    private readonly TcpMessageQueue messageQueue;
     
     private IpkTcpClient(TcpClient client)
     {
         this.client = client;
         this.clientStream = client.GetStream();
+        messageBuilder = new TcpMessageBuilder();
+        messageQueue = new TcpMessageQueue(messageBuilder);
     }
 
     public async Task SendMessage(Message message, CancellationToken cancellationToken = default)
@@ -55,11 +58,23 @@ public class IpkTcpClient : IIpkClient
         await clientStream.WriteAsync(messageString);
     }
 
-    public async Task<Message> Listen(CancellationToken cancellationToken = default)
+    public async Task<ResponseResult> Listen(CancellationToken cancellationToken = default)
     {
-        Memory<byte> buffer = new byte[2000];
-        var byteCount = await clientStream.ReadAsync(buffer, cancellationToken);
-        return messageBuilder.DecodeMessage(buffer.ToArray()[..byteCount]);
+        var message = messageQueue.Dequeue();
+        if (message == null)
+        {
+            Memory<byte> buffer = new byte[2000];
+            var byteCount = await clientStream.ReadAsync(buffer, cancellationToken);
+            messageQueue.Enqueue(buffer.ToArray()[..byteCount]);
+            message = messageQueue.Dequeue();
+        }
+        
+        var processingResult = ResponseProcessingResult.Ok;
+        if (message!.MessageType == MessageType.Unknown)
+        {
+            processingResult = ResponseProcessingResult.ParsingError;
+        }
+        return new ResponseResult(message, processingResult);
     }
 
     public void Dispose()

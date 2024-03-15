@@ -104,7 +104,7 @@ public class IpkUdpClient : IIpkClient
         await SendWithRetrial(messageId, byteMessage);
     }
 
-    public async Task<Message> Listen(CancellationToken cancellationToken = default)
+    public async Task<ResponseResult> Listen(CancellationToken cancellationToken = default)
     {
         var response = await client.ReceiveAsync(cancellationToken);
 
@@ -112,7 +112,7 @@ public class IpkUdpClient : IIpkClient
 
         if (message.MessageType == MessageType.Unknown)
         {
-            return message;
+            return new ResponseResult(message, ResponseProcessingResult.ParsingError);
         }
 
         if (message.MessageType == MessageType.Confirm)
@@ -142,12 +142,12 @@ public class IpkUdpClient : IIpkClient
             await SendConfirmation(messageId, cancellationToken);
             if (SeenMessages.Contains(messageId))
             {
-                return new Message() { MessageType = MessageType.AlreadyProcessed };
+                return new ResponseResult(message, ResponseProcessingResult.AlreadyProcessed);
             }
             SeenMessages.Add(messageId);
         }
 
-        return message;
+        return new ResponseResult(message);
     }
 
     private async Task SendWithRetrial(ushort messageId, byte[] message, CancellationToken cancellationToken = default)

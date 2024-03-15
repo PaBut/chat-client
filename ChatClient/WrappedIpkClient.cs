@@ -7,12 +7,14 @@ public class WrappedIpkClient : IDisposable
 {
     private readonly IIpkClient ipkClient;
     private readonly WorkflowGraph workflow;
+    private Action OnByeSent { get; set; }
     private string? displayName;
     private bool awaitReply = false;
-
-    public WrappedIpkClient(IIpkClient ipkClient)
+    
+    public WrappedIpkClient(IIpkClient ipkClient, Action onByeSent)
     {
         this.ipkClient = ipkClient;
+        this.OnByeSent = onByeSent;
         this.workflow = new();
     }
 
@@ -110,31 +112,38 @@ public class WrappedIpkClient : IDisposable
         workflow.NextState(MessageType.Join);
     }
     
-    public async Task<string?> Listen(CancellationToken cancellationToken = default)
+    private async Task SendErrorMessage(string errorMessage, CancellationToken cancellationToken = default)
     {
-        var message = await ipkClient.Listen(cancellationToken);
-
-        if (message.MessageType == MessageType.Confirm)
+        Message message = new()
         {
-            return null;
-        }
-
-        if (message.MessageType == MessageType.Unknown)
-        {
-            Message errorMessage = new()
+            MessageType = MessageType.Err,
+            Arguments = new Dictionary<MessageArguments, object>()
             {
-                MessageType = MessageType.Err,
-                Arguments = new Dictionary<MessageArguments, object>()
-                {
-                    { MessageArguments.DisplayName, displayName ?? "" },
-                    { MessageArguments.MessageContent, "Unsupported type of message" }
-                }
-            };
+                { MessageArguments.DisplayName, displayName ?? "" },
+                { MessageArguments.MessageContent, errorMessage }
+            }
+        };
             
-            await ipkClient.SendError(errorMessage, cancellationToken);
+        await ipkClient.SendError(message, cancellationToken);
+    }
+    
+    public async Task<(string? Message, bool isError)?> Listen(CancellationToken cancellationToken = default)
+    {
+        var result = await ipkClient.Listen(cancellationToken);
+
+        if (result.ProcessingResult == ResponseProcessingResult.AlreadyProcessed)
+        {
+            return null;
+        }
+
+        if (result.ProcessingResult == ResponseProcessingResult.ParsingError)
+        {
+            await SendErrorMessage("Failed to parse request", cancellationToken);
             
             return null;
         }
+        
+        var message = result.Message;
         
         bool? replySuccess = null;
         
@@ -146,24 +155,22 @@ public class WrappedIpkClient : IDisposable
         
         workflow.NextState(message.MessageType, replySuccess);
         
-        if(workflow.IsErrorState)
+        if(workflow.IsErrorState && message.MessageType != MessageType.Err)
         {
-            /*Message errorMessage = new()
-            {
-                MessageType = MessageType.Err,
-                Arguments = new Dictionary<MessageArguments, object>()
-                {
-                    { MessageArguments.DisplayName, displayName },
-                    { MessageArguments.MessageContent, "Unsupported type of message" }
-                }
-            };
+            await SendErrorMessage("Invalid state for this message", cancellationToken);
             
-            await ipkClient.SendError(errorMessage, cancellationToken);
-            
-            return null;*/
+            return null;
+        }
+
+        if (workflow.IsEndState)
+        {
+            OnByeSent();
+            Dispose();
+            return null;
         }
         
-        return message.ToString();
+        //messageWriter.WriteMessage(message);
+        return (message.ToString(), message.MessageType == MessageType.Err);
     }
     
     private void SetDisplayName(string displayName)

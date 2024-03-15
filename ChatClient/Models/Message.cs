@@ -4,6 +4,7 @@ public class Message
 {
     public MessageType MessageType { get; set; }
     public IDictionary<MessageArguments, object> Arguments { get; set; }
+    public bool IsUdp { get; set; } = false;
 
     public static Message? FromCommandLine(string line, out string? errorResponse)
     {
@@ -89,4 +90,10 @@ public class Message
 
         return null;
     }
+    
+    public static Message UnknownMessage => new()
+    {
+        MessageType = MessageType.Unknown,
+        Arguments = new Dictionary<MessageArguments, object>()
+    };
 }

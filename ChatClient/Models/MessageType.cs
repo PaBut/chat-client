@@ -10,6 +10,4 @@ public enum MessageType
     Msg,
     Confirm,
     Unknown,
-    ParsingError,
-    AlreadyProcessed
 }

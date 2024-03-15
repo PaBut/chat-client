@@ -33,8 +33,6 @@ if (!Enum.TryParse<SocketType>(commandLineOptions.SocketType, true, out var sock
     return;
 }
 
-bool isCanceled = false;
-
 IpkClientFactory ipkClientFactory = new(socketType, commandLineOptions.UdpConfirmationAttempts,
     commandLineOptions.UdpConfirmationTimeout);
 
@@ -59,9 +57,13 @@ if (ipkClient == null)
 
 Console.WriteLine($"Connected to {commandLineOptions.Host} on port {commandLineOptions.Port}");
 
-WrappedIpkClient wrappedIpkClient = new(ipkClient);
-
 CancellationTokenSource cancellationTokenSource = new();
+
+WrappedIpkClient wrappedIpkClient = new(ipkClient, () =>
+{
+    cancellationTokenSource.Cancel();
+    cancellationTokenSource.Dispose();
+});
 
 var token = cancellationTokenSource.Token;
 
@@ -73,23 +75,26 @@ Console.CancelKeyPress += async (sender, args) =>
     wrappedIpkClient.Dispose();
     Console.WriteLine("Exiting...");
     args.Cancel = true;
-    isCanceled = true;
 };
 
 Task senderTask = Task.Run(async () => await Sender(wrappedIpkClient, token));
 Task receiverTask = Task.Run(async () => await Receiver(wrappedIpkClient, token));
 
-Task.WaitAll(senderTask, receiverTask);
+try
+{
+    await Task.WhenAny(senderTask, receiverTask);
+}
+catch (Exception) { }
 
 async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellationToken)
 {
-    while (!isCanceled)
+    while (!cancellationToken.IsCancellationRequested)
     {
         var userInput = await Console.In.ReadLineAsync(cancellationToken);
 
         if (string.IsNullOrEmpty(userInput))
         {
-            return;
+            continue;
         }
 
         await wrappedClient.RunCommand(userInput, cancellationToken);
@@ -98,18 +103,20 @@ async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellation
 
 async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellationToken)
 {
-    while (!isCanceled)
+    while (!cancellationToken.IsCancellationRequested)
     {
-        var response = await wrappedClient.Listen(cancellationToken);
-
-        if(string.IsNullOrEmpty(response))
-        {
-            continue;
-        }
+        var result = await wrappedClient.Listen(cancellationToken);
         
-        Console.Write(response);
+        if(result != null && result.Value.Message != null)
+        {
+            if (result.Value.isError)
+            {
+                Console.Error.WriteLine(result.Value.Message);
+            }
+            else
+            {
+                Console.WriteLine(result.Value.Message);
+            }
+        }
     }
 }
-
-Console.ReadKey();
-Console.ReadKey();

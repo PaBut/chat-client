@@ -10,7 +10,7 @@ public class UdpMessageBuilder : IMessageBuilder
     {
         if (message.Length < 1)
         {
-            // TODO: Error processing
+            return Message.UnknownMessage;
         }
 
         var messageType = UdpMessageTypeCoder.GetMessageType(message[0]);
@@ -21,19 +21,16 @@ public class UdpMessageBuilder : IMessageBuilder
             case MessageType.Confirm:
                 if (message.Length < 3)
                 {
-                    // TODO: Validation error
+                    return Message.UnknownMessage;
                 }
 
                 arguments.Add(MessageArguments.ReferenceMessageId, BitConverter.ToUInt16(message[1..3]));
+                
                 break;
             case MessageType.Reply:
                 if (message.Length < 8)
                 {
-                    // TODO: Validation error
-                    return new Message()
-                    {
-                        MessageType = MessageType.Unknown
-                    };
+                    return Message.UnknownMessage;
                 }
 
                 arguments.Add(MessageArguments.MessageId, BitConverter.ToUInt16(message[1..3]));
@@ -52,7 +49,7 @@ public class UdpMessageBuilder : IMessageBuilder
             case MessageType.Msg:
                 if (message.Length < 7)
                 {
-                    // TODO: Validation error
+                    return Message.UnknownMessage;
                 }
 
                 arguments.Add(MessageArguments.MessageId, BitConverter.ToUInt16(message[1..3]));
@@ -68,12 +65,11 @@ public class UdpMessageBuilder : IMessageBuilder
 
                 break;
             case MessageType.Bye:
-                if (message.Length < 3)
+                if (message.Length >= 3)
                 {
-                    // TODO: Validation error
+                    arguments.Add(MessageArguments.MessageId, BitConverter.ToUInt16(message[1..3]));
                 }
-
-                arguments.Add(MessageArguments.ReferenceMessageId, BitConverter.ToInt16(message[1..3]));
+                
                 break;
         }
 

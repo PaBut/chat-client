@@ -4,10 +4,10 @@ using ChatClient.Utilities.Common;
 
 namespace ChatClient.Utilities.Tcp;
 
-public class TcpMessageBuilder : IMessageBuilder
+public class TcpMessageBuilder
 {
     private const string CLRF = "\r\n";
-    
+
     public byte[] GetByteMessage(Message message)
     {
         string messageString = TcpMessageTypeCoder.GetMessageString(message.MessageType);
@@ -68,21 +68,18 @@ public class TcpMessageBuilder : IMessageBuilder
         return Encoding.UTF8.GetBytes(messageString + CLRF);
     }
 
-    public Message DecodeMessage(byte[] message)
+    public Message DecodeMessage(string messageString)
     {
-        string messageString = Encoding.UTF8.GetString(message);
-
-        Console.Write($"////////////Server(decoded): {messageString}");
-
+        // Console.Write($"////////////Server(decoded): {messageString}");
         string[] messageParts = messageString.Split(" ");
 
         var stringMessageType = messageParts[0];
-        
+
         if (messageParts.Length > 1 && messageParts[1] == "FROM")
         {
             stringMessageType = string.Join(' ', messageParts[..2]);
         }
-        
+
         var messageType = TcpMessageTypeCoder.GetMessageType(stringMessageType);
 
         var messageArguments = new Dictionary<MessageArguments, object>();
@@ -93,31 +90,29 @@ public class TcpMessageBuilder : IMessageBuilder
 
             if (messageParts[3] != "IS")
             {
-                // Invalid Message
-                throw new Exception("Not supported");
+                return Message.UnknownMessage;
             }
-            
+
             messageArguments.Add(MessageArguments.MessageContent, string.Join(' ', messageParts[4..]));
         }
         else if (messageType == MessageType.Reply)
         {
             if (messageParts[1] != "OK" && messageParts[1] != "NOK")
             {
-                // Invalid Message
-                throw new Exception("Not supported");
+                return Message.UnknownMessage;
             }
 
             messageArguments.Add(MessageArguments.ReplyStatus, messageParts[1] == "OK");
 
             if (messageParts[2] != "IS")
             {
-                // Invalid Message
-                throw new Exception("Not supported");
+                return Message.UnknownMessage;
             }
 
             messageArguments.Add(MessageArguments.MessageContent, string.Join(' ', messageParts[3..]));
         }
-        else if (messageString.Contains(CLRF) && messageString.Split(CLRF)[0] == "BYE")
+        else if (messageString.Contains(CLRF) &&
+                 messageString.Split(CLRF).Contains(TcpMessageTypeCoder.GetMessageString(MessageType.Bye)))
         {
             Console.Write($"Server: {messageString}");
             messageType = MessageType.Bye;
