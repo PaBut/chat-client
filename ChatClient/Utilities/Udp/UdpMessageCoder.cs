@@ -1,10 +1,9 @@
 using System.Text;
 using ChatClient.Models;
-using ChatClient.Utilities.Common;
 
 namespace ChatClient.Utilities.Udp;
 
-public class UdpMessageBuilder : IMessageBuilder
+public class UdpMessageCoder
 {
     public Message DecodeMessage(byte[] message)
     {
@@ -73,7 +72,7 @@ public class UdpMessageBuilder : IMessageBuilder
                 break;
         }
 
-        return new Message()
+        return new Message
         {
             MessageType = messageType,
             Arguments = arguments

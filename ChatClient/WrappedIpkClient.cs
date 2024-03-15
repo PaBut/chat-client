@@ -7,6 +7,7 @@ public class WrappedIpkClient : IDisposable
 {
     private readonly IIpkClient ipkClient;
     private readonly WorkflowGraph workflow;
+    private readonly MessageValidator messageValidator = new();
     private Action OnByeSent { get; set; }
     private string? displayName;
     private bool awaitReply = false;
@@ -26,13 +27,13 @@ public class WrappedIpkClient : IDisposable
 
         if (commandText == "/rename")
         {
-            if(parts.Length < 2)
+            if(parts.Length != 2)
             {
                 Console.Error.WriteLine("ERROR: Invalid number of arguments for /rename");
                 return;
             }
 
-            var newUsername = string.Join(' ', parts[1..]);
+            var newUsername = parts[1];
             
             if(newUsername.Length > 20)
             {
@@ -44,7 +45,7 @@ public class WrappedIpkClient : IDisposable
 
             return;
         }
-        else if (commandText == "/help")
+        if (commandText == "/help")
         {
             Console.WriteLine("Help message");
             return;
@@ -55,6 +56,12 @@ public class WrappedIpkClient : IDisposable
         if (message.MessageType == MessageType.Unknown)
         {
             Console.Error.WriteLine($"ERROR: {errorResponse}");
+        }
+        
+        if (!messageValidator.IsValid(message))
+        {
+            Console.Error.WriteLine("ERROR: Invalid message format");
+            return;
         }
 
         if (!workflow.IsAllowedMessageType(message.MessageType))

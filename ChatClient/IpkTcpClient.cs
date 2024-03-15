@@ -8,48 +8,48 @@ public class IpkTcpClient : IIpkClient
 {
     private readonly TcpClient client;
     private readonly NetworkStream clientStream;
-    private readonly TcpMessageBuilder messageBuilder;
+    private readonly TcpMessageCoder messageCoder;
     private readonly TcpMessageQueue messageQueue;
     
     private IpkTcpClient(TcpClient client)
     {
         this.client = client;
         this.clientStream = client.GetStream();
-        messageBuilder = new TcpMessageBuilder();
-        messageQueue = new TcpMessageQueue(messageBuilder);
+        messageCoder = new TcpMessageCoder();
+        messageQueue = new TcpMessageQueue(messageCoder);
     }
 
     public async Task SendMessage(Message message, CancellationToken cancellationToken = default)
     {
-        var byteMessage = messageBuilder.GetByteMessage(message);
+        var byteMessage = messageCoder.GetByteMessage(message);
         
         await clientStream.WriteAsync(byteMessage, cancellationToken);
     }
     
     public async Task Authenticate(Message message, CancellationToken cancellationToken = default)
     {
-        var byteMessage = messageBuilder.GetByteMessage(message);
+        var byteMessage = messageCoder.GetByteMessage(message);
         
         await clientStream.WriteAsync(byteMessage, cancellationToken);
     }
     
     public async Task JoinChannel(Message message, CancellationToken cancellationToken = default)
     {
-        var byteMessage = messageBuilder.GetByteMessage(message);
+        var byteMessage = messageCoder.GetByteMessage(message);
         
         await clientStream.WriteAsync(byteMessage, cancellationToken);
     }
 
     public async Task SendError(Message message, CancellationToken cancellationToken = default)
     {
-        var byteMessage = messageBuilder.GetByteMessage(message);
+        var byteMessage = messageCoder.GetByteMessage(message);
         
         await clientStream.WriteAsync(byteMessage, cancellationToken);
     }
 
     public async Task Leave()
     {
-        var messageString = messageBuilder.GetByteMessage(new Message()
+        var messageString = messageCoder.GetByteMessage(new Message()
         {
             MessageType = MessageType.Bye,
             Arguments = new Dictionary<MessageArguments, object>()

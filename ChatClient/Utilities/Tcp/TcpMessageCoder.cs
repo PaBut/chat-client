@@ -1,10 +1,9 @@
 using System.Text;
 using ChatClient.Models;
-using ChatClient.Utilities.Common;
 
 namespace ChatClient.Utilities.Tcp;
 
-public class TcpMessageBuilder
+public class TcpMessageCoder
 {
     private const string CLRF = "\r\n";
 

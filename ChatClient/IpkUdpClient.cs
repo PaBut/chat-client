@@ -24,7 +24,7 @@ public class IpkUdpClient : IIpkClient
     // }
     
     private readonly UdpClient client;
-    private readonly UdpMessageBuilder messageBuilder = new();
+    private readonly UdpMessageCoder messageCoder = new();
     //private readonly IDictionary<ushort, ConfirmTimer> timers;
     private readonly ushort timeout;
     private readonly byte retrials;
@@ -50,7 +50,7 @@ public class IpkUdpClient : IIpkClient
 
         message.Arguments.Add(MessageArguments.MessageId, messageId);
 
-        var byteMessage = messageBuilder.GetByteMessage(message);
+        var byteMessage = messageCoder.GetByteMessage(message);
 
         await SendWithRetrial(messageId, byteMessage, cancellationToken);
     }
@@ -61,7 +61,7 @@ public class IpkUdpClient : IIpkClient
 
         message.Arguments.Add(MessageArguments.MessageId, messageId);
 
-        var byteMessage = messageBuilder.GetByteMessage(message);
+        var byteMessage = messageCoder.GetByteMessage(message);
 
         await SendWithRetrial(messageId, byteMessage, cancellationToken);
     }
@@ -72,7 +72,7 @@ public class IpkUdpClient : IIpkClient
 
         message.Arguments.Add(MessageArguments.MessageId, messageId);
 
-        var byteMessage = messageBuilder.GetByteMessage(message);
+        var byteMessage = messageCoder.GetByteMessage(message);
 
         await SendWithRetrial(messageId, byteMessage, cancellationToken);
     }
@@ -83,7 +83,7 @@ public class IpkUdpClient : IIpkClient
 
         message.Arguments.Add(MessageArguments.MessageId, messageId);
 
-        var byteMessage = messageBuilder.GetByteMessage(message);
+        var byteMessage = messageCoder.GetByteMessage(message);
 
         await SendWithRetrial(messageId, byteMessage, cancellationToken);
     }
@@ -92,7 +92,7 @@ public class IpkUdpClient : IIpkClient
     {
         var messageId = CurrentMessageId++;
 
-        var byteMessage = messageBuilder.GetByteMessage(new Message()
+        var byteMessage = messageCoder.GetByteMessage(new Message()
         {
             MessageType = MessageType.Bye,
             Arguments = new Dictionary<MessageArguments, object>()
@@ -108,7 +108,7 @@ public class IpkUdpClient : IIpkClient
     {
         var response = await client.ReceiveAsync(cancellationToken);
 
-        var message = messageBuilder.DecodeMessage(response.Buffer);
+        var message = messageCoder.DecodeMessage(response.Buffer);
 
         if (message.MessageType == MessageType.Unknown)
         {
@@ -207,7 +207,7 @@ public class IpkUdpClient : IIpkClient
 
     private async Task SendConfirmation(ushort messageId, CancellationToken cancellationToken = default)
     {
-        var byteMessage = messageBuilder.GetByteMessage(new Message()
+        var byteMessage = messageCoder.GetByteMessage(new Message()
         {
             MessageType = MessageType.Confirm,
             Arguments = new Dictionary<MessageArguments, object>()

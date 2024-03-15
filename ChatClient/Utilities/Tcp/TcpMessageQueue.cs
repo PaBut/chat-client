@@ -7,11 +7,11 @@ public class TcpMessageQueue
 {
     private const string CLRF = "\r\n";
     private readonly Queue<Message> messageQueue = new();
-    private readonly TcpMessageBuilder messageBuilder;
+    private readonly TcpMessageCoder _messageCoder;
 
-    public TcpMessageQueue(TcpMessageBuilder messageBuilder)
+    public TcpMessageQueue(TcpMessageCoder messageCoder)
     {
-        this.messageBuilder = messageBuilder;
+        this._messageCoder = messageCoder;
     }
 
     public void Enqueue(byte[] encodedMessage)
@@ -20,7 +20,7 @@ public class TcpMessageQueue
             .Where(part => !string.IsNullOrEmpty(part));
         foreach (var part in messageParts)
         {
-            var message = messageBuilder.DecodeMessage(part);
+            var message = _messageCoder.DecodeMessage(part);
             messageQueue.Enqueue(message);
         }
     }
