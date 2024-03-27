@@ -1,13 +1,11 @@
-﻿using System.Net.Sockets;
-using System.Threading.Channels;
-using ChatClient;
+﻿using ChatClient;
 using CommandLine;
 using CommandLine.Text;
 using SocketType = ChatClient.SocketType;
 
 var parserResult = new Parser(with =>
 {
-    with.AutoHelp = true;
+    with.AutoHelp = false;
     with.HelpWriter = Console.Out;
 }).ParseArguments<CommandLineOptions>(args);
 
@@ -69,10 +67,7 @@ var token = cancellationTokenSource.Token;
 
 Console.CancelKeyPress += async (sender, args) =>
 {
-    await wrappedIpkClient.Leave();
-    cancellationTokenSource.Cancel();
-    cancellationTokenSource.Dispose();
-    wrappedIpkClient.Dispose();
+    await SendByeAndDisposeElements();
     Console.WriteLine("Exiting...");
     args.Cancel = true;
 };
@@ -83,6 +78,7 @@ Task receiverTask = Task.Run(async () => await Receiver(wrappedIpkClient, token)
 try
 {
     await Task.WhenAny(senderTask, receiverTask);
+    await SendByeAndDisposeElements();
 }
 catch (Exception) { }
 
@@ -92,9 +88,14 @@ async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellation
     {
         var userInput = await Console.In.ReadLineAsync(cancellationToken);
 
-        if (string.IsNullOrEmpty(userInput))
+        if (userInput == string.Empty)
         {
             continue;
+        }
+
+        if (userInput == null)
+        {
+            return;
         }
 
         await wrappedClient.RunCommand(userInput, cancellationToken);
@@ -119,4 +120,15 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
             }
         }
     }
+}
+
+async Task SendByeAndDisposeElements()
+{
+    await wrappedIpkClient.Leave();
+    if (!token.IsCancellationRequested)
+    {
+        cancellationTokenSource.Cancel();
+    }
+    cancellationTokenSource.Dispose();
+    wrappedIpkClient.Dispose();
 }

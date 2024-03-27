@@ -103,20 +103,18 @@ public class WrappedIpkClient : IDisposable
     { 
         SetDisplayName((string)message.Arguments[MessageArguments.DisplayName]);
         await ipkClient.Authenticate(message, cancellationToken);
-        awaitReply = true;
-        while(awaitReply){}
-
         workflow.NextState(MessageType.Auth);
+        AwaitForReply();
+
+        Console.WriteLine("Got here that fast");
     }
     
     private async Task JoinChannel(Message message, CancellationToken cancellationToken = default)
     {
         message.Arguments.Add(MessageArguments.DisplayName, displayName!);
         await ipkClient.JoinChannel(message, cancellationToken);
-        awaitReply = true;
-        while(awaitReply){}
-        
         workflow.NextState(MessageType.Join);
+        AwaitForReply();
     }
     
     private async Task SendErrorMessage(string errorMessage, CancellationToken cancellationToken = default)
@@ -132,6 +130,17 @@ public class WrappedIpkClient : IDisposable
         };
             
         await ipkClient.SendError(message, cancellationToken);
+    }
+    
+    private void AwaitForReply()
+    {
+        awaitReply = true;
+        while(awaitReply){}
+    }
+
+    private void UnblockAwait()
+    {
+        awaitReply = false;
     }
     
     public async Task<(string? Message, bool isError)?> Listen(CancellationToken cancellationToken = default)
@@ -156,7 +165,6 @@ public class WrappedIpkClient : IDisposable
         
         if (message.MessageType == MessageType.Reply)
         {
-            awaitReply = false;
             replySuccess = (bool) message.Arguments[MessageArguments.ReplyStatus];
         }
         
@@ -164,9 +172,15 @@ public class WrappedIpkClient : IDisposable
         
         if(workflow.IsErrorState && message.MessageType != MessageType.Err)
         {
+            Console.WriteLine("Server sent" + message.ToString());
             await SendErrorMessage("Invalid state for this message", cancellationToken);
             
             return null;
+        }
+        
+        if (message.MessageType == MessageType.Reply)
+        {
+            UnblockAwait();
         }
 
         if (workflow.IsEndState)
