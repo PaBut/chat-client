@@ -1,7 +1,12 @@
-﻿using ChatClient;
+﻿using System.Net.Sockets;
+using ChatClient;
+using ChatClient.Exceptions;
+using ChatClient.Utilities;
 using CommandLine;
 using CommandLine.Text;
 using SocketType = ChatClient.SocketType;
+
+var errorWriter = new ErrorWriter(Console.Error);
 
 var parserResult = new Parser(with =>
 {
@@ -23,11 +28,11 @@ var commandLineOptions = parserResult
         Console.WriteLine($"Server port: {options.Port}");
         Console.WriteLine($"UDP confirmation timeout: {options.UdpConfirmationTimeout}");
         Console.WriteLine($"UDP confirmation attempts: {options.UdpConfirmationAttempts}");
-    }).WithNotParsed(errors => { Console.Error.WriteLine("Invalid command line options"); }).Value;
+    }).WithNotParsed(errors => { errorWriter.WriteError("Invalid command line options"); }).Value;
 
 if (!Enum.TryParse<SocketType>(commandLineOptions.SocketType, true, out var socketType))
 {
-    Console.Error.WriteLine("Invalid command line options");
+    errorWriter.WriteError("Invalid command line options");
     return;
 }
 
@@ -49,7 +54,7 @@ IIpkClient? ipkClient = null;
 
 if (ipkClient == null)
 {
-    Console.WriteLine("ERROR: Connection refused");
+    errorWriter.WriteError("Connection refused");
     return;
 }
 
@@ -61,7 +66,7 @@ WrappedIpkClient wrappedIpkClient = new(ipkClient, () =>
 {
     cancellationTokenSource.Cancel();
     cancellationTokenSource.Dispose();
-});
+}, errorWriter);
 
 var token = cancellationTokenSource.Token;
 
@@ -80,7 +85,7 @@ try
     await Task.WhenAny(senderTask, receiverTask);
     await SendByeAndDisposeElements();
 }
-catch (Exception) { }
+catch (TaskCanceledException) { }
 
 async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellationToken)
 {
@@ -98,7 +103,16 @@ async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellation
             return;
         }
 
-        await wrappedClient.RunCommand(userInput, cancellationToken);
+        try
+        {
+            await wrappedClient.RunCommand(userInput, cancellationToken);
+        }
+        catch (SocketException)
+        {
+            errorWriter.WriteError("Socket exception");
+            return;
+        }
+
     }
 }
 
@@ -106,18 +120,26 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
 {
     while (!cancellationToken.IsCancellationRequested)
     {
-        var result = await wrappedClient.Listen(cancellationToken);
-        
-        if(result != null && result.Value.Message != null)
+        try
         {
-            if (result.Value.isError)
+            var result = await wrappedClient.Listen(cancellationToken);
+
+            if (result != null && result.Value.Message != null)
             {
-                Console.Error.WriteLine(result.Value.Message);
+                if (result.Value.isError)
+                {
+                    errorWriter.WriteError(result.Value.Message);
+                }
+                else
+                {
+                    Console.WriteLine(result.Value.Message);
+                }
             }
-            else
-            {
-                Console.WriteLine(result.Value.Message);
-            }
+        }
+        catch (SocketException)
+        {
+            errorWriter.WriteError("Socket exception");
+            return;
         }
     }
 }

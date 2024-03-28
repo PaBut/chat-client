@@ -1,3 +1,4 @@
+using ChatClient.Exceptions;
 using ChatClient.Models;
 using ChatClient.Utilities;
 
@@ -8,14 +9,16 @@ public class WrappedIpkClient : IDisposable
     private readonly IIpkClient ipkClient;
     private readonly WorkflowGraph workflow;
     private readonly MessageValidator messageValidator = new();
+    private ErrorWriter errorWriter;
     private Action OnByeSent { get; set; }
     private string? displayName;
     private bool awaitReply = false;
     
-    public WrappedIpkClient(IIpkClient ipkClient, Action onByeSent)
+    public WrappedIpkClient(IIpkClient ipkClient, Action onByeSent, ErrorWriter errorWriter)
     {
         this.ipkClient = ipkClient;
         this.OnByeSent = onByeSent;
+        this.errorWriter = errorWriter;
         this.workflow = new();
     }
 
@@ -29,7 +32,7 @@ public class WrappedIpkClient : IDisposable
         {
             if(parts.Length != 2)
             {
-                Console.Error.WriteLine("ERROR: Invalid number of arguments for /rename");
+                errorWriter.WriteError("Invalid number of arguments for /rename");
                 return;
             }
 
@@ -37,7 +40,7 @@ public class WrappedIpkClient : IDisposable
             
             if(newUsername.Length > 20)
             {
-                Console.Error.WriteLine("ERROR: Display name must be 20 characters or less");
+                errorWriter.WriteError("Display name must be 20 characters or less");
                 return;
             }
 
@@ -55,32 +58,39 @@ public class WrappedIpkClient : IDisposable
 
         if (message.MessageType == MessageType.Unknown)
         {
-            Console.Error.WriteLine($"ERROR: {errorResponse}");
+            errorWriter.WriteError(errorResponse);
         }
         
         if (!messageValidator.IsValid(message))
         {
-            Console.Error.WriteLine("ERROR: Invalid message format");
+            errorWriter.WriteError("Invalid message format");
             return;
         }
 
         if (!workflow.IsAllowedMessageType(message.MessageType))
         {
-            Console.WriteLine("ERROR: Invalid state for this message");
+            errorWriter.WriteError("Invalid state for this message");
             return;
         }
-        
-        switch (message.MessageType)
+
+        try
         {
-            case MessageType.Auth:
-                await Authenticate(message, cancellationToken);
-                break;
-            case MessageType.Join:
-                await JoinChannel(message, cancellationToken);
-                break;
-            case MessageType.Msg:
-                await SendMessage(message, cancellationToken);
-                break;
+            switch (message.MessageType)
+            {
+                case MessageType.Auth:
+                    await Authenticate(message, cancellationToken);
+                    break;
+                case MessageType.Join:
+                    await JoinChannel(message, cancellationToken);
+                    break;
+                case MessageType.Msg:
+                    await SendMessage(message, cancellationToken);
+                    break;
+            }   
+        }
+        catch (NotReceivedConfirmException)
+        {
+            errorWriter.WriteError("Error: Server did not receive your message");
         }
     }
 
@@ -105,8 +115,6 @@ public class WrappedIpkClient : IDisposable
         await ipkClient.Authenticate(message, cancellationToken);
         workflow.NextState(MessageType.Auth);
         AwaitForReply();
-
-        Console.WriteLine("Got here that fast");
     }
     
     private async Task JoinChannel(Message message, CancellationToken cancellationToken = default)
@@ -172,7 +180,6 @@ public class WrappedIpkClient : IDisposable
         
         if(workflow.IsErrorState && message.MessageType != MessageType.Err)
         {
-            Console.WriteLine("Server sent" + message.ToString());
             await SendErrorMessage("Invalid state for this message", cancellationToken);
             
             return null;
