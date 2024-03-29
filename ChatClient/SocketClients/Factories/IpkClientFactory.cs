@@ -1,4 +1,6 @@
-namespace ChatClient;
+using ChatClient.Enums;
+
+namespace ChatClient.SocketClients.Factories;
 
 public class IpkClientFactory
 {

@@ -11,6 +11,11 @@ public class ErrorWriter
     
     public void WriteError(string message)
     {
-        writer.WriteLine($"ERROR: {message}");
+        writer.WriteLine($"ERR: {message}");
+    }
+    
+    public void Write(string message)
+    {
+        writer.WriteLine(message);
     }
 }

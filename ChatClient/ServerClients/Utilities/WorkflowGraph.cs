@@ -1,6 +1,6 @@
-using ChatClient.Models;
+using ChatClient.Enums;
 
-namespace ChatClient.Utilities;
+namespace ChatClient.ServerClients.Utilities;
 
 public class WorkflowGraph
 {
@@ -8,6 +8,7 @@ public class WorkflowGraph
         new Dictionary<(ClientState, (MessageType, bool?)), ClientState>()
         {
             { (ClientState.Start, (MessageType.Auth, null)), ClientState.Authentication },
+            { (ClientState.Authentication, (MessageType.Auth, null)), ClientState.Authentication },
             { (ClientState.Authentication, (MessageType.Reply, true)), ClientState.Open },
             { (ClientState.Authentication, (MessageType.Reply, false)), ClientState.Authentication },
             { (ClientState.Authentication, (MessageType.Bye, null)), ClientState.End },
@@ -79,4 +80,5 @@ public class WorkflowGraph
     
     public bool IsErrorState => currentState == ClientState.Error;
     public bool IsEndState => currentState == ClientState.End;
+    public bool IsAuthenticated => currentState is ClientState.Open or ClientState.Error;
 }

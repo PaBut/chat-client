@@ -1,6 +1,6 @@
-using ChatClient.Models;
+using ChatClient.Enums;
 
-namespace ChatClient.Utilities.Udp;
+namespace ChatClient.SocketClients.Utilities.Udp;
 
 public static class UdpMessageTypeCoder
 {

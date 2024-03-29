@@ -1,8 +1,12 @@
+using ChatClient.Enums;
 using ChatClient.Exceptions;
 using ChatClient.Models;
+using ChatClient.Models.Validation;
+using ChatClient.ServerClients.Utilities;
+using ChatClient.SocketClients;
 using ChatClient.Utilities;
 
-namespace ChatClient;
+namespace ChatClient.ServerClients;
 
 public class WrappedIpkClient : IDisposable
 {
@@ -10,14 +14,22 @@ public class WrappedIpkClient : IDisposable
     private readonly WorkflowGraph workflow;
     private readonly MessageValidator messageValidator = new();
     private ErrorWriter errorWriter;
-    private Action OnByeSent { get; set; }
+    private Action onByeSent { get; set; }
     private string? displayName;
     private bool awaitReply = false;
     
+    private const string helpText = """
+                                    Available commands:
+                                    * /help - Display help message
+                                    * /auth <username> <secret> <displayName> - Authenticate with the server
+                                    * /join <channelId> - Join a channel
+                                    * <message> - Send a message
+                                    """;
+
     public WrappedIpkClient(IIpkClient ipkClient, Action onByeSent, ErrorWriter errorWriter)
     {
         this.ipkClient = ipkClient;
-        this.OnByeSent = onByeSent;
+        this.onByeSent = onByeSent;
         this.errorWriter = errorWriter;
         this.workflow = new();
     }
@@ -25,20 +37,20 @@ public class WrappedIpkClient : IDisposable
     public async Task RunCommand(string command, CancellationToken cancellationToken = default)
     {
         var parts = command.Split(' ');
-        
+
         string commandText = parts.Any() ? parts[0] : command;
 
         if (commandText == "/rename")
         {
-            if(parts.Length != 2)
+            if (parts.Length != 2)
             {
                 errorWriter.WriteError("Invalid number of arguments for /rename");
                 return;
             }
 
             var newUsername = parts[1];
-            
-            if(newUsername.Length > 20)
+
+            if (newUsername.Length > 20)
             {
                 errorWriter.WriteError("Display name must be 20 characters or less");
                 return;
@@ -48,19 +60,21 @@ public class WrappedIpkClient : IDisposable
 
             return;
         }
+
         if (commandText == "/help")
         {
-            Console.WriteLine("Help message");
+            Console.WriteLine(helpText);
             return;
         }
-        
+
         var message = Message.FromCommandLine(command, out var errorResponse);
 
         if (message.MessageType == MessageType.Unknown)
         {
             errorWriter.WriteError(errorResponse);
+            return;
         }
-        
+
         if (!messageValidator.IsValid(message))
         {
             errorWriter.WriteError("Invalid message format");
@@ -86,7 +100,7 @@ public class WrappedIpkClient : IDisposable
                 case MessageType.Msg:
                     await SendMessage(message, cancellationToken);
                     break;
-            }   
+            }
         }
         catch (NotReceivedConfirmException)
         {
@@ -96,11 +110,14 @@ public class WrappedIpkClient : IDisposable
 
     public async Task Leave()
     {
-        await ipkClient.Leave();
-        
+        if (workflow.IsAuthenticated)
+        {
+            await ipkClient.Leave();
+        }
+
         workflow.NextState(MessageType.Bye);
     }
-    
+
     private async Task SendMessage(Message message, CancellationToken cancellationToken = default)
     {
         message.Arguments.Add(MessageArguments.DisplayName, displayName!);
@@ -108,15 +125,15 @@ public class WrappedIpkClient : IDisposable
 
         workflow.NextState(MessageType.Msg);
     }
-    
+
     private async Task Authenticate(Message message, CancellationToken cancellationToken = default)
-    { 
+    {
         SetDisplayName((string)message.Arguments[MessageArguments.DisplayName]);
         await ipkClient.Authenticate(message, cancellationToken);
         workflow.NextState(MessageType.Auth);
         AwaitForReply();
     }
-    
+
     private async Task JoinChannel(Message message, CancellationToken cancellationToken = default)
     {
         message.Arguments.Add(MessageArguments.DisplayName, displayName!);
@@ -124,7 +141,7 @@ public class WrappedIpkClient : IDisposable
         workflow.NextState(MessageType.Join);
         AwaitForReply();
     }
-    
+
     private async Task SendErrorMessage(string errorMessage, CancellationToken cancellationToken = default)
     {
         Message message = new()
@@ -136,22 +153,25 @@ public class WrappedIpkClient : IDisposable
                 { MessageArguments.MessageContent, errorMessage }
             }
         };
-            
+
         await ipkClient.SendError(message, cancellationToken);
     }
-    
+
     private void AwaitForReply()
     {
         awaitReply = true;
-        while(awaitReply){}
+        while (awaitReply)
+        {
+        }
     }
 
     private void UnblockAwait()
     {
         awaitReply = false;
     }
-    
-    public async Task<(string? Message, bool isError)?> Listen(CancellationToken cancellationToken = default)
+
+    public async Task<(string? Message, bool ToStderr)?> Listen(
+        CancellationToken cancellationToken = default)
     {
         var result = await ipkClient.Listen(cancellationToken);
 
@@ -163,28 +183,28 @@ public class WrappedIpkClient : IDisposable
         if (result.ProcessingResult == ResponseProcessingResult.ParsingError)
         {
             await SendErrorMessage("Failed to parse request", cancellationToken);
-            
+
             return null;
         }
-        
+
         var message = result.Message;
-        
+
         bool? replySuccess = null;
-        
+
         if (message.MessageType == MessageType.Reply)
         {
-            replySuccess = (bool) message.Arguments[MessageArguments.ReplyStatus];
+            replySuccess = (bool)message.Arguments[MessageArguments.ReplyStatus];
         }
-        
+
         workflow.NextState(message.MessageType, replySuccess);
-        
-        if(workflow.IsErrorState && message.MessageType != MessageType.Err)
+
+        if (workflow.IsErrorState && message.MessageType != MessageType.Err)
         {
             await SendErrorMessage("Invalid state for this message", cancellationToken);
-            
+
             return null;
         }
-        
+
         if (message.MessageType == MessageType.Reply)
         {
             UnblockAwait();
@@ -192,15 +212,14 @@ public class WrappedIpkClient : IDisposable
 
         if (workflow.IsEndState)
         {
-            OnByeSent();
+            onByeSent();
             Dispose();
             return null;
         }
-        
-        //messageWriter.WriteMessage(message);
-        return (message.ToString(), message.MessageType == MessageType.Err);
+
+        return (message.ToString(), message.MessageType is MessageType.Err or MessageType.Reply);
     }
-    
+
     private void SetDisplayName(string displayName)
     {
         this.displayName = displayName;

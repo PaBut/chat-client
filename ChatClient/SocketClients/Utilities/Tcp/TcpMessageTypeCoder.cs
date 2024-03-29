@@ -1,6 +1,6 @@
-using ChatClient.Models;
+using ChatClient.Enums;
 
-namespace ChatClient.Utilities.Tcp;
+namespace ChatClient.SocketClients.Utilities.Tcp;
 
 public static class TcpMessageTypeCoder
 {

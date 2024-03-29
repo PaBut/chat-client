@@ -1,4 +1,4 @@
-namespace ChatClient.Models;
+namespace ChatClient.Enums;
 
 public enum MessageArguments
 {

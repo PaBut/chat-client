@@ -1,4 +1,4 @@
-namespace ChatClient;
+namespace ChatClient.Enums;
 
 public enum SocketType
 {

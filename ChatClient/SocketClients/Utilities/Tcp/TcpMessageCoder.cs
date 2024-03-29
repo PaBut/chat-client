@@ -1,7 +1,9 @@
 using System.Text;
+using ChatClient.Enums;
+using ChatClient.Exceptions;
 using ChatClient.Models;
 
-namespace ChatClient.Utilities.Tcp;
+namespace ChatClient.SocketClients.Utilities.Tcp;
 
 public class TcpMessageCoder
 {
@@ -20,56 +22,30 @@ public class TcpMessageCoder
 
         if (message.MessageType == MessageType.Join)
         {
-            if (!message.Arguments.ContainsKey(MessageArguments.ChannelId) &&
-                !message.Arguments.ContainsKey(MessageArguments.DisplayName))
-            {
-                // Error
-            }
-
             messageString += (string)message.Arguments[MessageArguments.ChannelId] + " AS " +
                              (string)message.Arguments[MessageArguments.DisplayName];
         }
         else if (message.MessageType == MessageType.Auth)
         {
-            if (!message.Arguments.ContainsKey(MessageArguments.UserName) &&
-                !message.Arguments.ContainsKey(MessageArguments.DisplayName) &&
-                !message.Arguments.ContainsKey(MessageArguments.Secret))
-            {
-                // Error
-            }
-
             messageString += (string)message.Arguments[MessageArguments.UserName] + " AS " +
                              (string)message.Arguments[MessageArguments.DisplayName] + " USING " +
                              (string)message.Arguments[MessageArguments.Secret];
         }
         else if (message.MessageType == MessageType.Msg || message.MessageType == MessageType.Err)
         {
-            if (!message.Arguments.ContainsKey(MessageArguments.DisplayName) &&
-                !message.Arguments.ContainsKey(MessageArguments.MessageContent))
-            {
-                // Error
-            }
-
             messageString += (string)message.Arguments[MessageArguments.DisplayName] + " IS " +
                              (string)message.Arguments[MessageArguments.MessageContent];
-        }
-        else if (message.MessageType == MessageType.Reply)
-        {
-            // Not supported processing
         }
         else
         {
             throw new Exception("Not supported");
         }
-
-        Console.WriteLine(messageString);
-
+        
         return Encoding.UTF8.GetBytes(messageString + CLRF);
     }
 
     public Message DecodeMessage(string messageString)
     {
-        // Console.Write($"////////////Server(decoded): {messageString}");
         string[] messageParts = messageString.Split(" ");
 
         var stringMessageType = messageParts[0];
@@ -109,12 +85,6 @@ public class TcpMessageCoder
             }
 
             messageArguments.Add(MessageArguments.MessageContent, string.Join(' ', messageParts[3..]));
-        }
-        else if (messageString.Contains(CLRF) &&
-                 messageString.Split(CLRF).Contains(TcpMessageTypeCoder.GetMessageString(MessageType.Bye)))
-        {
-            Console.Write($"Server: {messageString}");
-            messageType = MessageType.Bye;
         }
         else if (messageType != MessageType.Bye)
         {

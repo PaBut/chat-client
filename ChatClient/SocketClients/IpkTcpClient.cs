@@ -1,8 +1,9 @@
 using System.Net.Sockets;
+using ChatClient.Enums;
 using ChatClient.Models;
-using ChatClient.Utilities.Tcp;
+using ChatClient.SocketClients.Utilities.Tcp;
 
-namespace ChatClient;
+namespace ChatClient.SocketClients;
 
 public class IpkTcpClient : IIpkClient
 {

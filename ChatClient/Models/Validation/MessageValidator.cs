@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
+using ChatClient.Enums;
 
-namespace ChatClient.Models;
+namespace ChatClient.Models.Validation;
 
 public class MessageValidator
 {

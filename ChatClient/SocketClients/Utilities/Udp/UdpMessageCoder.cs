@@ -1,7 +1,8 @@
 using System.Text;
+using ChatClient.Enums;
 using ChatClient.Models;
 
-namespace ChatClient.Utilities.Udp;
+namespace ChatClient.SocketClients.Utilities.Udp;
 
 public class UdpMessageCoder
 {
@@ -124,8 +125,7 @@ public class UdpMessageCoder
             case MessageType.Bye:
                 break;
             default:
-                // TODO: Error not supported
-                break;
+                throw new Exception("Not supported");
         }
         
         return byteMessage.ToArray();

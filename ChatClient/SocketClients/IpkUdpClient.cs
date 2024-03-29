@@ -1,39 +1,24 @@
-using System.Collections.Concurrent;
 using System.Net;
-using System.Net.Sockets;
+using ChatClient.Enums;
+using ChatClient.Exceptions;
 using ChatClient.Models;
-using ChatClient.Utilities.Udp;
+using ChatClient.SocketClients.Utilities.Udp;
 using UdpClient = System.Net.Sockets.UdpClient;
 
-namespace ChatClient;
+namespace ChatClient.SocketClients;
 
 public class IpkUdpClient : IIpkClient
 {
-    // private class ConfirmTimer
-    // {
-    //     public Timer Timer { get; }
-    //     public int Retrials { get; set; }
-    //     public ManualResetEvent ResetEvent { get; }
-    //
-    //     public ConfirmTimer(Timer timer, ManualResetEvent resetEvent, int retrials)
-    //     {
-    //         Timer = timer;
-    //         ResetEvent = resetEvent;
-    //         Retrials = retrials;
-    //     }
-    // }
-    
     private readonly UdpClient client;
     private readonly UdpMessageCoder messageCoder = new();
-    //private readonly IDictionary<ushort, ConfirmTimer> timers;
     private readonly ushort timeout;
     private readonly byte retrials;
 
     private bool portUpdated = false;
     private IPEndPoint remoteEndPoint;
-    private ushort CurrentMessageId = 0;
-    private List<ushort> SeenMessages = new();
-    private List<ushort> ConfirmedMessages = new();
+    private ushort currentMessageId = 0;
+    private List<ushort> seenMessages = new();
+    private List<ushort> confirmedMessages = new();
 
     private IpkUdpClient(UdpClient client, IPEndPoint endpoint, byte retrials, ushort timeout)
     {
@@ -41,12 +26,11 @@ public class IpkUdpClient : IIpkClient
         this.retrials = retrials;
         this.timeout = timeout;
         this.remoteEndPoint = endpoint;
-        //timers = new ConcurrentDictionary<ushort, ConfirmTimer>();
     }
 
     public async Task SendMessage(Message message, CancellationToken cancellationToken = default)
     {
-        var messageId = CurrentMessageId++;
+        var messageId = currentMessageId++;
 
         message.Arguments.Add(MessageArguments.MessageId, messageId);
 
@@ -57,7 +41,7 @@ public class IpkUdpClient : IIpkClient
 
     public async Task Authenticate(Message message, CancellationToken cancellationToken = default)
     {
-        var messageId = CurrentMessageId++;
+        var messageId = currentMessageId++;
 
         message.Arguments.Add(MessageArguments.MessageId, messageId);
 
@@ -68,7 +52,7 @@ public class IpkUdpClient : IIpkClient
 
     public async Task JoinChannel(Message message, CancellationToken cancellationToken = default)
     {
-        var messageId = CurrentMessageId++;
+        var messageId = currentMessageId++;
 
         message.Arguments.Add(MessageArguments.MessageId, messageId);
 
@@ -79,7 +63,7 @@ public class IpkUdpClient : IIpkClient
 
     public async Task SendError(Message message, CancellationToken cancellationToken = default)
     {
-        var messageId = CurrentMessageId++;
+        var messageId = currentMessageId++;
 
         message.Arguments.Add(MessageArguments.MessageId, messageId);
 
@@ -90,7 +74,7 @@ public class IpkUdpClient : IIpkClient
 
     public async Task Leave()
     {
-        var messageId = CurrentMessageId++;
+        var messageId = currentMessageId++;
 
         var byteMessage = messageCoder.GetByteMessage(new Message()
         {
@@ -118,17 +102,10 @@ public class IpkUdpClient : IIpkClient
         if (message.MessageType == MessageType.Confirm)
         {
             var messageId = (ushort)message.Arguments[MessageArguments.ReferenceMessageId];
-            // if (timers.ContainsKey(messageId))
-            // {
-                //var timerEntry = timers[messageId];
-                // timerEntry.ResetEvent.Set();
-                // await timerEntry.Timer.DisposeAsync();
-                //timers.Remove(messageId);
-            // }
 
-            if (!ConfirmedMessages.Contains(messageId))
+            if (!confirmedMessages.Contains(messageId))
             {
-                ConfirmedMessages.Add(messageId);
+                confirmedMessages.Add(messageId);
             }
         }
         else
@@ -140,11 +117,11 @@ public class IpkUdpClient : IIpkClient
             }
             var messageId = (ushort)message.Arguments[MessageArguments.MessageId];
             await SendConfirmation(messageId, cancellationToken);
-            if (SeenMessages.Contains(messageId))
+            if (seenMessages.Contains(messageId))
             {
                 return new ResponseResult(message, ResponseProcessingResult.AlreadyProcessed);
             }
-            SeenMessages.Add(messageId);
+            seenMessages.Add(messageId);
         }
 
         return new ResponseResult(message);
@@ -153,56 +130,20 @@ public class IpkUdpClient : IIpkClient
     private async Task SendWithRetrial(ushort messageId, byte[] message, CancellationToken cancellationToken = default)
     {
 
-        for (int i = 0; i < retrials + 1 && !ConfirmedMessages.Contains(messageId); i++)
+        for (int i = 0; i < retrials + 1 && !confirmedMessages.Contains(messageId); i++)
         {
             await client.SendAsync(message, message.Length, remoteEndPoint);
 
             await Task.WhenAny(Task.Delay(timeout, cancellationToken), Task.Run(() =>
             {
-                while (!ConfirmedMessages.Contains(messageId)) { }
+                while (!confirmedMessages.Contains(messageId)) { }
             }));
         }
-        
-        // var resetEvent = new ManualResetEvent(false);
-        //
-        // var timer = new Timer(
-        //     async (state) =>
-        //     {
-        //         if (!timers.ContainsKey(messageId))
-        //         {
-        //             return;
-        //         }
-        //         if (timers[messageId].Retrials-- <= 0)
-        //         {
-        //             resetEvent.Set();
-        //             await timers[messageId].Timer.DisposeAsync();
-        //         }
-        //
-        //         await client.SendAsync(message, message.Length, remoteEndPoint);
-        //     }, null, TimeSpan.Zero, TimeSpan.FromMilliseconds(timeout));
-        //
-        // timers.Add(messageId, new ConfirmTimer(timer, resetEvent, retrials));
-        //
-        // resetEvent.WaitOne();
 
-        // for (int i = 0; i < retrials + 1 && !SeenMessages.Contains(messageId); i++)
-        // {
-        //     await client.SendAsync(message, message.Length, remoteEndPoint);
-        //
-        //     var task = client.ReceiveAsync(cancellationToken).AsTask();
-        //
-        //     if (await Task.WhenAny(task, Task.Delay(TimeSpan.FromMilliseconds(timeout), cancellationToken)) == task)
-        //     {
-        //         var response = await task;
-        //         
-        //         if (response.Buffer.Length > 2 && response.Buffer[0] == 0 &&
-        //             BitConverter.ToInt16(response.Buffer[1..3], 0) == messageId)
-        //         {
-        //             SeenMessages.Add(messageId);
-        //             return;
-        //         }
-        //     }
-        // }
+        if (!confirmedMessages.Contains(messageId))
+        {
+            throw new NotReceivedConfirmException();
+        }
     }
 
     private async Task SendConfirmation(ushort messageId, CancellationToken cancellationToken = default)
@@ -238,7 +179,6 @@ public class IpkUdpClient : IIpkClient
 
             var client = new UdpClient();
             client.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
-            //client.Client.Listen();
 
             return new IpkUdpClient(client, endpoint, retrials, timeout);
         }

@@ -1,14 +1,14 @@
 using CommandLine;
 
-namespace ChatClient;
+namespace ChatClient.Models;
 
 public class CommandLineOptions
 {
     [Option('t', Required = true, HelpText = "Socket type (tcp, udp)")]
-    public string SocketType { get; set; }
+    public string SocketType { get; set; } = null!;
 
     [Option('s', Required = true, HelpText = "Server IP or hostname")]
-    public string Host { get; set; }
+    public string Host { get; set; } = null!;
 
     [Option('p', Required = false, HelpText = "Server port", Default = (ushort)4567)]
     public ushort Port { get; set; }

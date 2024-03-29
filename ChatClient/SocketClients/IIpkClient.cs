@@ -1,6 +1,6 @@
 using ChatClient.Models;
 
-namespace ChatClient;
+namespace ChatClient.SocketClients;
 
 public interface IIpkClient : IDisposable
 {

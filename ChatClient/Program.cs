@@ -1,10 +1,12 @@
 ﻿using System.Net.Sockets;
-using ChatClient;
-using ChatClient.Exceptions;
+using ChatClient.Models;
+using ChatClient.ServerClients;
+using ChatClient.SocketClients;
+using ChatClient.SocketClients.Factories;
 using ChatClient.Utilities;
 using CommandLine;
 using CommandLine.Text;
-using SocketType = ChatClient.SocketType;
+using SocketType = ChatClient.Enums.SocketType;
 
 var errorWriter = new ErrorWriter(Console.Error);
 
@@ -20,19 +22,13 @@ if (args.Contains("-h"))
     return;
 }
 
-var commandLineOptions = parserResult
-    .WithParsed(options =>
-    {
-        Console.WriteLine($"Socket type: {options.SocketType}");
-        Console.WriteLine($"Server IP or hostname: {options.Host}");
-        Console.WriteLine($"Server port: {options.Port}");
-        Console.WriteLine($"UDP confirmation timeout: {options.UdpConfirmationTimeout}");
-        Console.WriteLine($"UDP confirmation attempts: {options.UdpConfirmationAttempts}");
-    }).WithNotParsed(errors => { errorWriter.WriteError("Invalid command line options"); }).Value;
+var commandLineOptions = parserResult.Value;
 
-if (!Enum.TryParse<SocketType>(commandLineOptions.SocketType, true, out var socketType))
+if (parserResult.Errors.Any() || !Enum.TryParse<SocketType>
+        (commandLineOptions.SocketType, true, out var socketType))
 {
     errorWriter.WriteError("Invalid command line options");
+    Environment.ExitCode = 1;
     return;
 }
 
@@ -43,7 +39,7 @@ IIpkClient? ipkClient = null;
 
 // for (int i = 0; i < 100 && ipkClient == null; i++)
 // {
-    ipkClient = ipkClientFactory.CreateClient(commandLineOptions.Host, commandLineOptions.Port);
+ipkClient = ipkClientFactory.CreateClient(commandLineOptions.Host, commandLineOptions.Port);
 //     Console.WriteLine($"Debug: {i}th try");
 //     if (ipkClient != null)
 //     {
@@ -54,7 +50,8 @@ IIpkClient? ipkClient = null;
 
 if (ipkClient == null)
 {
-    errorWriter.WriteError("Connection refused");
+    errorWriter.WriteError("Connection can not be instantiated");
+    Environment.ExitCode = 1;
     return;
 }
 
@@ -69,13 +66,13 @@ WrappedIpkClient wrappedIpkClient = new(ipkClient, () =>
 }, errorWriter);
 
 var token = cancellationTokenSource.Token;
+var waitForByeSent = new ManualResetEvent(false);
 
-// Console.CancelKeyPress += async (sender, args) =>
-// {
-//     await SendByeAndDisposeElements();
-//     Console.WriteLine("Exiting...");
-//     args.Cancel = true;
-// };
+Console.CancelKeyPress += async (sender, args) =>
+{
+    waitForByeSent.WaitOne();
+    args.Cancel = true;
+};
 
 Task senderTask = Task.Run(async () => await Sender(wrappedIpkClient, token));
 Task receiverTask = Task.Run(async () => await Receiver(wrappedIpkClient, token));
@@ -84,7 +81,10 @@ try
 {
     await Task.WhenAny(senderTask, receiverTask);
 }
-catch (TaskCanceledException) { }
+catch (TaskCanceledException)
+{
+}
+
 
 async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellationToken)
 {
@@ -107,12 +107,13 @@ async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellation
         {
             await wrappedClient.RunCommand(userInput, cancellationToken);
         }
-        catch (SocketException)
+        catch (Exception ex) when (ex is SocketException or IOException)
         {
             errorWriter.WriteError("Socket exception");
+            DisposeElements();
+            Environment.ExitCode = 1;
             return;
         }
-
     }
 }
 
@@ -126,9 +127,9 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
 
             if (result != null && result.Value.Message != null)
             {
-                if (result.Value.isError)
+                if (result.Value.ToStderr)
                 {
-                    errorWriter.WriteError(result.Value.Message);
+                    errorWriter.Write(result.Value.Message);
                 }
                 else
                 {
@@ -136,9 +137,11 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
                 }
             }
         }
-        catch (SocketException)
+        catch (Exception ex) when (ex is SocketException or IOException)
         {
             errorWriter.WriteError("Socket exception");
+            DisposeElements();
+            Environment.ExitCode = 1;
             return;
         }
     }
@@ -146,11 +149,17 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
 
 async Task SendByeAndDisposeElements()
 {
+    await wrappedIpkClient.Leave();
+    DisposeElements();
+    waitForByeSent.Set();
+}
+
+void DisposeElements()
+{
     if (!token.IsCancellationRequested)
     {
         cancellationTokenSource.Cancel();
     }
-    await wrappedIpkClient.Leave();
     cancellationTokenSource.Dispose();
     wrappedIpkClient.Dispose();
 }

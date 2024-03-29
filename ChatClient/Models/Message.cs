@@ -1,24 +1,19 @@
+using ChatClient.Enums;
+
 namespace ChatClient.Models;
 
 public class Message
 {
     public MessageType MessageType { get; set; }
     public IDictionary<MessageArguments, object> Arguments { get; set; }
-    public bool IsUdp { get; set; } = false;
-
-    public static Message? FromCommandLine(string line, out string? errorResponse)
+    
+    public static Message FromCommandLine(string line, out string? errorResponse)
     {
-        var unknownMessage = new Message()
-        {
-            MessageType = MessageType.Unknown,
-            Arguments = new Dictionary<MessageArguments, object>()
-        };
         errorResponse = null;
-        
+
         if (line[0] != '/')
         {
-            return new Message()
-            {
+            return new Message{
                 MessageType = MessageType.Msg,
                 Arguments = new Dictionary<MessageArguments, object>()
                 {
@@ -26,17 +21,18 @@ public class Message
                 }
             };
         }
-        
+
         var parts = line.Split(' ');
         var command = parts[0];
-        
+
         if (command == "/auth")
         {
             if (parts.Length != 4)
             {
-                return unknownMessage;
+                errorResponse = "Invalid number of arguments for /auth";
+                return Message.UnknownMessage;
             }
-            
+
             return new Message()
             {
                 MessageType = MessageType.Auth,
@@ -50,11 +46,12 @@ public class Message
         }
         else if (command == "/join")
         {
-            if(parts.Length != 2)
+            if (parts.Length != 2)
             {
-                return unknownMessage;
+                errorResponse = "Invalid number of arguments for /join";
+                return Message.UnknownMessage;
             }
-            
+
             return new Message()
             {
                 MessageType = MessageType.Join,
@@ -65,32 +62,32 @@ public class Message
             };
         }
 
-        return unknownMessage;
+        return Message.UnknownMessage;
     }
 
     public override string? ToString()
     {
-        if(MessageType == MessageType.Msg)
+        if (MessageType == MessageType.Msg)
         {
-            return $"{(string) Arguments[MessageArguments.DisplayName]}: " +
-                   $"{(string) Arguments[MessageArguments.MessageContent]}";
+            return $"{(string)Arguments[MessageArguments.DisplayName]}: " +
+                   $"{(string)Arguments[MessageArguments.MessageContent]}";
         }
 
         if (MessageType == MessageType.Err)
         {
-            return $"ERROR FROM {(string) Arguments[MessageArguments.DisplayName]}: " +
-                   $"{(string) Arguments[MessageArguments.MessageContent]}";
+            return $"ERR FROM {(string)Arguments[MessageArguments.DisplayName]}: " +
+                   $"{(string)Arguments[MessageArguments.MessageContent]}";
         }
 
         if (MessageType == MessageType.Reply)
         {
-            var success = (bool) Arguments[MessageArguments.ReplyStatus] ? "SUCCESS" : "ERROR";
-            return $"{success}: {(string) Arguments[MessageArguments.MessageContent]}";
+            var success = (bool)Arguments[MessageArguments.ReplyStatus] ? "Success" : "Failure";
+            return $"{success}: {(string)Arguments[MessageArguments.MessageContent]}";
         }
 
         return null;
     }
-    
+
     public static Message UnknownMessage => new()
     {
         MessageType = MessageType.Unknown,
