@@ -70,12 +70,12 @@ WrappedIpkClient wrappedIpkClient = new(ipkClient, () =>
 
 var token = cancellationTokenSource.Token;
 
-Console.CancelKeyPress += async (sender, args) =>
-{
-    await SendByeAndDisposeElements();
-    Console.WriteLine("Exiting...");
-    args.Cancel = true;
-};
+// Console.CancelKeyPress += async (sender, args) =>
+// {
+//     await SendByeAndDisposeElements();
+//     Console.WriteLine("Exiting...");
+//     args.Cancel = true;
+// };
 
 Task senderTask = Task.Run(async () => await Sender(wrappedIpkClient, token));
 Task receiverTask = Task.Run(async () => await Receiver(wrappedIpkClient, token));
@@ -83,7 +83,6 @@ Task receiverTask = Task.Run(async () => await Receiver(wrappedIpkClient, token)
 try
 {
     await Task.WhenAny(senderTask, receiverTask);
-    await SendByeAndDisposeElements();
 }
 catch (TaskCanceledException) { }
 
@@ -100,6 +99,7 @@ async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellation
 
         if (userInput == null)
         {
+            await SendByeAndDisposeElements();
             return;
         }
 
@@ -146,11 +146,11 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
 
 async Task SendByeAndDisposeElements()
 {
-    await wrappedIpkClient.Leave();
     if (!token.IsCancellationRequested)
     {
         cancellationTokenSource.Cancel();
     }
+    await wrappedIpkClient.Leave();
     cancellationTokenSource.Dispose();
     wrappedIpkClient.Dispose();
 }
