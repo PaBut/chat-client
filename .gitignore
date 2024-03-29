@@ -4,7 +4,6 @@
 **/.idea/dictionaries
 **/.idea/httpRequests/
 
-# Sensitive or high-churn files
 **/.idea/**/dataSources/
 **/.idea/**/dataSources.ids
 **/.idea/**/dataSources.xml
@@ -12,8 +11,6 @@
 **/.idea/**/sqlDataSources.xml
 **/.idea/**/dynamic.xml
 
-# Rider
-# Rider auto-generates .iml files, and contentModel.xml
 **/.idea/**/*.iml
 **/.idea/**/contentModel.xml
 **/.idea/**/modules.xml
@@ -21,7 +18,7 @@
 *.suo
 *.user
 .vs/
-[Bb]in/
-[Oo]bj/
+ChatClient/[Bb]in/*
+ChatClient/[Oo]bj/*
 _UpgradeReport_Files/
 [Pp]ackages/
