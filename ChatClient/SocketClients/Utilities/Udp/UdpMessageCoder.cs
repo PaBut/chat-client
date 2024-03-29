@@ -61,7 +61,7 @@ public class UdpMessageCoder
                 var messageContentEnd2 = GetEndOfTheFloatingMessage(displayNameEnd + 1, message);
 
                 arguments.Add(MessageArguments.MessageContent,
-                    Encoding.UTF8.GetString(message[displayNameEnd..messageContentEnd2]));
+                    Encoding.UTF8.GetString(message[(displayNameEnd+1)..messageContentEnd2]));
 
                 break;
             case MessageType.Bye:

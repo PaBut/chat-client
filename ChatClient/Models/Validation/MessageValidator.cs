@@ -22,7 +22,7 @@ public class MessageValidator
         }
     }
     
-    private readonly IDictionary<MessageArguments, StringValidationItem> maximalLengths = new Dictionary<MessageArguments, StringValidationItem>
+    private readonly IDictionary<MessageArguments, StringValidationItem> validationItems = new Dictionary<MessageArguments, StringValidationItem>
     {
         {MessageArguments.UserName, new(20, "^[A-z0-9-]+$")},
         {MessageArguments.DisplayName, new(20, @"^[\x20-\x7E]+$")},
@@ -35,7 +35,7 @@ public class MessageValidator
     {
         foreach (var entry in message.Arguments)
         {
-            if (maximalLengths.TryGetValue(entry.Key, out var validationItem))
+            if (validationItems.TryGetValue(entry.Key, out var validationItem))
             {
                 if (!validationItem.ValidateItem((string)entry.Value))
                 {
@@ -47,13 +47,13 @@ public class MessageValidator
         return true;
     }
     
-    public bool ValidateArgument(MessageArguments argument, string value)
-    {
-        if (maximalLengths.TryGetValue(argument, out var validationItem))
-        {
-            return validationItem.ValidateItem(value);
-        }
-
-        return false;
-    }
+    // public bool ValidateArgument(MessageArguments argument, string value)
+    // {
+    //     if (validationItems.TryGetValue(argument, out var validationItem))
+    //     {
+    //         return validationItem.ValidateItem(value);
+    //     }
+    //
+    //     return false;
+    // }
 }

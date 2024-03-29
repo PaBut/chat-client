@@ -59,16 +59,12 @@ Console.WriteLine($"Connected to {commandLineOptions.Host} on port {commandLineO
 
 CancellationTokenSource cancellationTokenSource = new();
 
-WrappedIpkClient wrappedIpkClient = new(ipkClient, () =>
-{
-    cancellationTokenSource.Cancel();
-    cancellationTokenSource.Dispose();
-}, errorWriter);
+WrappedIpkClient wrappedIpkClient = new(ipkClient, errorWriter);
 
 var token = cancellationTokenSource.Token;
 var waitForByeSent = new ManualResetEvent(false);
 
-Console.CancelKeyPress += async (sender, args) =>
+Console.CancelKeyPress += (sender, args) =>
 {
     waitForByeSent.WaitOne();
     args.Cancel = true;
@@ -81,9 +77,7 @@ try
 {
     await Task.WhenAny(senderTask, receiverTask);
 }
-catch (TaskCanceledException)
-{
-}
+catch (TaskCanceledException) { }
 
 
 async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellationToken)
@@ -125,6 +119,12 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
         {
             var result = await wrappedClient.Listen(cancellationToken);
 
+            if (result.HasValue && result.Value.ByeReceived)
+            {
+                DisposeElements();
+                return;
+            }
+            
             if (result != null && result.Value.Message != null)
             {
                 if (result.Value.ToStderr)

@@ -13,8 +13,8 @@ public class WrappedIpkClient : IDisposable
     private readonly IIpkClient ipkClient;
     private readonly WorkflowGraph workflow;
     private readonly MessageValidator messageValidator = new();
-    private ErrorWriter errorWriter;
-    private Action onByeSent { get; set; }
+    private readonly ErrorWriter errorWriter;
+    
     private string? displayName;
     private bool awaitReply = false;
     
@@ -26,10 +26,9 @@ public class WrappedIpkClient : IDisposable
                                     * <message> - Send a message
                                     """;
 
-    public WrappedIpkClient(IIpkClient ipkClient, Action onByeSent, ErrorWriter errorWriter)
+    public WrappedIpkClient(IIpkClient ipkClient, ErrorWriter errorWriter)
     {
         this.ipkClient = ipkClient;
-        this.onByeSent = onByeSent;
         this.errorWriter = errorWriter;
         this.workflow = new();
     }
@@ -170,7 +169,7 @@ public class WrappedIpkClient : IDisposable
         awaitReply = false;
     }
 
-    public async Task<(string? Message, bool ToStderr)?> Listen(
+    public async Task<(string? Message, bool ToStderr, bool ByeReceived)?> Listen(
         CancellationToken cancellationToken = default)
     {
         var result = await ipkClient.Listen(cancellationToken);
@@ -183,6 +182,15 @@ public class WrappedIpkClient : IDisposable
         if (result.ProcessingResult == ResponseProcessingResult.ParsingError)
         {
             await SendErrorMessage("Failed to parse request", cancellationToken);
+            workflow.SetToErrorState();
+
+            return null;
+        }
+
+        if (!messageValidator.IsValid(result.Message))
+        {
+            await SendErrorMessage("Message is not valid", cancellationToken);
+            workflow.SetToErrorState();
 
             return null;
         }
@@ -212,12 +220,10 @@ public class WrappedIpkClient : IDisposable
 
         if (workflow.IsEndState)
         {
-            onByeSent();
-            Dispose();
-            return null;
+            return (null, false, true);
         }
 
-        return (message.ToString(), message.MessageType is MessageType.Err or MessageType.Reply);
+        return (message.ToString(), message.MessageType is MessageType.Err or MessageType.Reply, false);
     }
 
     private void SetDisplayName(string displayName)

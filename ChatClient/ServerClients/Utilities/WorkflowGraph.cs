@@ -76,6 +76,11 @@ public class WorkflowGraph
         return allowedMessageTypes[currentState]!.Contains(messageType);
     }
     
+    public void SetToErrorState()
+    {
+        currentState = ClientState.Error;
+    }
+    
     public ClientState CurrentState => currentState;
     
     public bool IsErrorState => currentState == ClientState.Error;
