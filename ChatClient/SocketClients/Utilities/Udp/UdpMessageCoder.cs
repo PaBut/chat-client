@@ -19,7 +19,7 @@ public class UdpMessageCoder
         switch (messageType)
         {
             case MessageType.Confirm:
-                if (message.Length < 3)
+                if (message.Length != 3)
                 {
                     return Message.UnknownMessage;
                 }

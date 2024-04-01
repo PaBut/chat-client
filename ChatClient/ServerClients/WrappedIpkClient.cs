@@ -14,10 +14,10 @@ public class WrappedIpkClient : IDisposable
     private readonly WorkflowGraph workflow;
     private readonly MessageValidator messageValidator = new();
     private readonly ErrorWriter errorWriter;
-    
+
     private string? displayName;
     private bool awaitReply = false;
-    
+
     private const string helpText = """
                                     Available commands:
                                     * /help - Display help message
@@ -169,7 +169,7 @@ public class WrappedIpkClient : IDisposable
         awaitReply = false;
     }
 
-    public async Task<(string? Message, bool ToStderr, bool ByeReceived)?> Listen(
+    public async Task<(string? Message, bool ToStderr, bool IsServerError, bool ByeReceived)?> Listen(
         CancellationToken cancellationToken = default)
     {
         var result = await ipkClient.Listen(cancellationToken);
@@ -183,16 +183,14 @@ public class WrappedIpkClient : IDisposable
         {
             await SendErrorMessage("Failed to parse request", cancellationToken);
             workflow.SetToErrorState();
-
-            return null;
+            return ("ERR: Failed to parse server response", true, false, false);
         }
 
         if (!messageValidator.IsValid(result.Message))
         {
             await SendErrorMessage("Message is not valid", cancellationToken);
             workflow.SetToErrorState();
-
-            return null;
+            return ("ERR: Server sent message is not valid", true, false, false);
         }
 
         var message = result.Message;
@@ -209,8 +207,7 @@ public class WrappedIpkClient : IDisposable
         if (workflow.IsErrorState && message.MessageType != MessageType.Err)
         {
             await SendErrorMessage("Invalid state for this message", cancellationToken);
-
-            return null;
+            return ("ERR: Invalid state for this message", true, false, false);
         }
 
         if (message.MessageType == MessageType.Reply)
@@ -220,10 +217,11 @@ public class WrappedIpkClient : IDisposable
 
         if (workflow.IsEndState)
         {
-            return (null, false, true);
+            return (null, false, false, true);
         }
 
-        return (message.ToString(), message.MessageType is MessageType.Err or MessageType.Reply, false);
+        return (message.ToString(), message.MessageType is MessageType.Err or MessageType.Reply,
+            message.MessageType == MessageType.Err, false);
     }
 
     private void SetDisplayName(string displayName)

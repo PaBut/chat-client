@@ -15,7 +15,8 @@ public static class UdpMessageTypeCoder
         { 0xFF, MessageType.Bye },
     };
 
-    public static MessageType GetMessageType(byte code) => MessageTypeMap[code];
+    public static MessageType GetMessageType(byte code) =>
+        MessageTypeMap.ContainsKey(code) ? MessageTypeMap[code] : MessageType.Unknown;
 
     public static byte GetMessageTypeCode(MessageType type)
         => MessageTypeMap.First(t => t.Value == type).Key;

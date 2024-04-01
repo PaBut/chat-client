@@ -35,18 +35,7 @@ if (parserResult.Errors.Any() || !Enum.TryParse<SocketType>
 IpkClientFactory ipkClientFactory = new(socketType, commandLineOptions.UdpConfirmationAttempts,
     commandLineOptions.UdpConfirmationTimeout);
 
-IIpkClient? ipkClient = null;
-
-// for (int i = 0; i < 100 && ipkClient == null; i++)
-// {
-ipkClient = ipkClientFactory.CreateClient(commandLineOptions.Host, commandLineOptions.Port);
-//     Console.WriteLine($"Debug: {i}th try");
-//     if (ipkClient != null)
-//     {
-//         Console.WriteLine("Finally");
-//     }
-// }
-
+IIpkClient? ipkClient = ipkClientFactory.CreateClient(commandLineOptions.Host, commandLineOptions.Port);
 
 if (ipkClient == null)
 {
@@ -55,18 +44,25 @@ if (ipkClient == null)
     return;
 }
 
-Console.WriteLine($"Connected to {commandLineOptions.Host} on port {commandLineOptions.Port}");
-
 CancellationTokenSource cancellationTokenSource = new();
 
 WrappedIpkClient wrappedIpkClient = new(ipkClient, errorWriter);
 
 var token = cancellationTokenSource.Token;
 var waitForByeSent = new ManualResetEvent(false);
+var locker = new object();
+var isEndStateProcessing = false;
 
 Console.CancelKeyPress += (sender, args) =>
 {
-    waitForByeSent.WaitOne();
+    lock (locker)
+    {
+        if (!isEndStateProcessing)
+        {
+            isEndStateProcessing = true;
+            SendByeAndDisposeElements().GetAwaiter().GetResult();
+        }
+    }
     args.Cancel = true;
 };
 
@@ -93,7 +89,14 @@ async Task Sender(WrappedIpkClient wrappedClient, CancellationToken cancellation
 
         if (userInput == null)
         {
-            await SendByeAndDisposeElements();
+            lock (locker)
+            {
+                if (!isEndStateProcessing)
+                {
+                    isEndStateProcessing = true;
+                    SendByeAndDisposeElements().GetAwaiter().GetResult();
+                }
+            }
             return;
         }
 
@@ -130,6 +133,11 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
                 if (result.Value.ToStderr)
                 {
                     errorWriter.Write(result.Value.Message);
+                    if (result.Value.IsServerError)
+                    {
+                        await SendByeAndDisposeElements();
+                        return;
+                    }
                 }
                 else
                 {
