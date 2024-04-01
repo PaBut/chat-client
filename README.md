@@ -87,4 +87,6 @@ For testing purposes reference server and testing project were used. Basically a
 
 The core of the project ```WrappedIpkClient``` is being tested there. Any possible commands and some of its edgecases are tested there. Mostly messages sent to server, client's reaction on different requests are checked. The tests are present in the repository together with the project.
 
-Tests were mainly implemented for regression testing and for functionality check. The only thing is, they are need to be ran sequentially.
+Tests were mainly implemented for regression testing and for functionality check. The only thing is, they are need to be ran sequentially. Here's the screenshot of the presented tests.
+
+![alt text](./test_check.png)
