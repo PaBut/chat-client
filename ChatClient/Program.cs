@@ -135,6 +135,7 @@ async Task Receiver(WrappedIpkClient wrappedClient, CancellationToken cancellati
                     errorWriter.Write(result.Value.Message);
                     if (result.Value.IsServerError)
                     {
+                        Environment.ExitCode = 1;
                         await SendByeAndDisposeElements();
                         return;
                     }

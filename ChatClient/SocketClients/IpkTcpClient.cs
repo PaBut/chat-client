@@ -8,14 +8,22 @@ namespace ChatClient.SocketClients;
 public class IpkTcpClient : IIpkClient
 {
     private readonly TcpClient client;
-    private readonly NetworkStream clientStream;
+    private readonly ITcpNetworkWriterProxy clientStream;
     private readonly TcpMessageCoder messageCoder;
     private readonly TcpMessageQueue messageQueue;
     
-    private IpkTcpClient(TcpClient client)
+    public IpkTcpClient(TcpClient client)
     {
         this.client = client;
-        this.clientStream = client.GetStream();
+        this.clientStream = new TcpNetworkStreamProxy(client.GetStream());
+        messageCoder = new TcpMessageCoder();
+        messageQueue = new TcpMessageQueue(messageCoder);
+    }
+    
+    public IpkTcpClient(TcpClient client, ITcpNetworkWriterProxy clientStream)
+    {
+        this.client = client;
+        this.clientStream = clientStream;
         messageCoder = new TcpMessageCoder();
         messageQueue = new TcpMessageQueue(messageCoder);
     }

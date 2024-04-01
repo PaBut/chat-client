@@ -2,6 +2,7 @@ using System.Net;
 using ChatClient.Enums;
 using ChatClient.Exceptions;
 using ChatClient.Models;
+using ChatClient.SocketClients.Proxies.Udp;
 using ChatClient.SocketClients.Utilities.Udp;
 using UdpClient = System.Net.Sockets.UdpClient;
 
@@ -9,7 +10,7 @@ namespace ChatClient.SocketClients;
 
 public class IpkUdpClient : IIpkClient
 {
-    private readonly UdpClient client;
+    private readonly IUdpClientProxy client;
     private readonly UdpMessageCoder messageCoder = new();
     private readonly ushort timeout;
     private readonly byte retrials;
@@ -20,7 +21,7 @@ public class IpkUdpClient : IIpkClient
     private List<ushort> seenMessages = new();
     private List<ushort> confirmedMessages = new();
 
-    private IpkUdpClient(UdpClient client, IPEndPoint endpoint, byte retrials, ushort timeout)
+    public IpkUdpClient(IUdpClientProxy client, IPEndPoint endpoint, byte retrials, ushort timeout)
     {
         this.client = client;
         this.retrials = retrials;
@@ -180,7 +181,7 @@ public class IpkUdpClient : IIpkClient
             var client = new UdpClient();
             client.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
 
-            return new IpkUdpClient(client, endpoint, retrials, timeout);
+            return new IpkUdpClient(new UdpClientProxy(client), endpoint, retrials, timeout);
         }
         catch (Exception)
         {

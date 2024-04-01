@@ -130,7 +130,7 @@ public class WrappedIpkClient : IDisposable
         SetDisplayName((string)message.Arguments[MessageArguments.DisplayName]);
         await ipkClient.Authenticate(message, cancellationToken);
         workflow.NextState(MessageType.Auth);
-        AwaitForReply();
+        AwaitForReply(cancellationToken);
     }
 
     private async Task JoinChannel(Message message, CancellationToken cancellationToken = default)
@@ -138,7 +138,7 @@ public class WrappedIpkClient : IDisposable
         message.Arguments.Add(MessageArguments.DisplayName, displayName!);
         await ipkClient.JoinChannel(message, cancellationToken);
         workflow.NextState(MessageType.Join);
-        AwaitForReply();
+        AwaitForReply(cancellationToken);
     }
 
     private async Task SendErrorMessage(string errorMessage, CancellationToken cancellationToken = default)
@@ -156,10 +156,10 @@ public class WrappedIpkClient : IDisposable
         await ipkClient.SendError(message, cancellationToken);
     }
 
-    private void AwaitForReply()
+    private void AwaitForReply(CancellationToken cancellationToken = default)
     {
         awaitReply = true;
-        while (awaitReply)
+        while (awaitReply && !cancellationToken.IsCancellationRequested)
         {
         }
     }
